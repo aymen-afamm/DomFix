@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'screens/splash_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'screens/login_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const MyApp());
 }
 
@@ -20,10 +23,9 @@ class MyApp extends StatelessWidget {
           primary: Color(0xFFD9FF00),
           secondary: Color(0xFFD9FF00),
           surface: Color(0xFF101419),
-          background: Color(0xFF0B0F14),
         ),
       ),
-      home: const SplashScreen(),
+      home: const LoginScreen(),
     );
   }
 }

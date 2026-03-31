@@ -9,4 +9,5 @@ class AppColors {
   static const Color onSurfaceVariant = Color(0xFFC5C9AC);
   static const Color primaryContainer = Color(0xFFCDF200);
   static const Color neonAccent = Color(0xFFD9FF00);
+  static const Color onPrimary = Color(0xFF2B3400);
 }
