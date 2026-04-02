@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 
 class OnboardingPage1 extends StatelessWidget {
@@ -6,155 +8,71 @@ class OnboardingPage1 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned(
-          top: MediaQuery.of(context).size.height * 0.25,
-          right: -80,
-          child: Container(
-            width: 256,
-            height: 256,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  AppColors.primaryContainer.withValues(alpha: 0.05),
-                  AppColors.background.withValues(alpha: 0),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: MediaQuery.of(context).size.height * 0.25,
-          left: -80,
-          child: Container(
-            width: 192,
-            height: 192,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  AppColors.primaryContainer.withValues(alpha: 0.05),
-                  AppColors.background.withValues(alpha: 0),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Center(
+    return Container(
+      color: AppColors.background,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildHeroVisual(),
-              const SizedBox(height: 48),
+              const Spacer(flex: 2),
+              _buildAnimation(),
+              const Spacer(flex: 1),
               _buildContent(),
+              const Spacer(flex: 2),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildHeroVisual() {
+  Widget _buildAnimation() {
     return SizedBox(
-      width: 320,
-      height: 320,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 320,
-            height: 320,
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                colors: [
-                  AppColors.primaryContainer.withValues(alpha: 0.05),
-                  AppColors.background.withValues(alpha: 0),
-                ],
-              ),
-            ),
-          ),
-          Container(
-            width: 280,
-            height: 280,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.onSurface.withValues(alpha: 0.1),
-              ),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 128,
-                  height: 128,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerHighest.withValues(alpha: 0.6),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.primaryContainer.withValues(alpha: 0.2),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.neonAccent.withValues(alpha: 0.3),
-                        blurRadius: 40,
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.psychology,
-                    size: 64,
-                    color: AppColors.primaryContainer,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+      height: 250,
+      child: Lottie.asset(
+        'assets/images/image1.json',
+        fit: BoxFit.contain,
+        repeat: true,
+        animate: true,
       ),
     );
   }
 
   Widget _buildContent() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        children: [
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: TextStyle(
-                fontFamily: 'SpaceGrotesk',
-                fontSize: 36,
-                fontWeight: FontWeight.w900,
-                color: AppColors.onSurface,
-                height: 1.2,
-                letterSpacing: -0.5,
+    return Column(
+      children: [
+        RichText(
+          textAlign: TextAlign.center,
+          text: TextSpan(
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              color: AppColors.onSurface,
+              height: 1.2,
+              letterSpacing: -0.5,
+            ),
+            children: [
+              const TextSpan(text: 'AI-Powered '),
+              TextSpan(
+                text: 'Diagnosis',
+                style: TextStyle(color: AppColors.primaryContainer),
               ),
-              children: [
-                const TextSpan(text: 'AI-Powered '),
-                TextSpan(
-                  text: 'Diagnosis',
-                  style: TextStyle(color: AppColors.primaryContainer),
-                ),
-              ],
-            ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Describe your home issue and let our intelligence find the fix.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 18,
-              color: AppColors.onSurfaceVariant,
-              height: 1.5,
-            ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Describe your home issue and let our intelligence find the fix.',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: AppColors.onSurfaceVariant,
+            height: 1.4,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

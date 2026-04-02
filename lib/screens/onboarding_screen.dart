@@ -4,6 +4,8 @@ import '../theme/app_colors.dart';
 import '../widgets/onboarding_page1.dart';
 import '../widgets/onboarding_page2.dart';
 import '../widgets/onboarding_page3.dart';
+import '../services/preferences_service.dart';
+import 'login_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -35,12 +37,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         curve: Curves.easeInOut,
       );
     } else {
-      // Navigate to main app
+      PreferencesService.completeOnboarding();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
     }
   }
 
   void _skip() {
-    // Navigate to main app
+    PreferencesService.completeOnboarding();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
   }
 
   @override
@@ -77,25 +87,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildMeshBackground() {
     return Container(
       decoration: BoxDecoration(
+        color: AppColors.background,
         gradient: RadialGradient(
           center: const Alignment(0, -0.5),
           radius: 1.5,
           colors: [
-            AppColors.primaryContainer.withValues(alpha: 0.05),
+            AppColors.primaryContainer.withValues(alpha: 0.03),
             AppColors.background,
           ],
-        ),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: const Alignment(0, 1),
-            radius: 1.5,
-            colors: [
-              AppColors.primaryContainer.withValues(alpha: 0.02),
-              AppColors.background.withValues(alpha: 0),
-            ],
-          ),
         ),
       ),
     );
@@ -118,13 +117,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           GestureDetector(
             onTap: _skip,
-            child: Text(
-              'SKIP',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                letterSpacing: 3,
-                fontWeight: FontWeight.w500,
-                color: AppColors.onSurfaceVariant,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.secondary,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'SKIP',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.onSurfaceVariant,
+                ),
               ),
             ),
           ),
@@ -135,11 +141,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildFooter() {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
       child: Column(
         children: [
           _buildPageIndicator(),
-          const SizedBox(height: 40),
+          const SizedBox(height: 32),
           _buildNextButton(),
         ],
       ),
@@ -154,17 +160,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 32 : 6,
-          height: 6,
+          width: isActive ? 32 : 8,
+          height: 8,
           decoration: BoxDecoration(
             color: isActive
                 ? AppColors.primaryContainer
-                : AppColors.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(3),
+                : AppColors.secondary,
+            borderRadius: BorderRadius.circular(4),
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: AppColors.neonAccent.withValues(alpha: 0.3),
+                      color: AppColors.neonAccent.withValues(alpha: 0.4),
                       blurRadius: 12,
                     ),
                   ]
@@ -181,14 +187,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         width: double.infinity,
-        height: 64,
+        height: 56,
         decoration: BoxDecoration(
-          color: AppColors.primaryContainer,
-          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primaryContainer,
+              AppColors.primaryContainer.withValues(alpha: 0.8),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.neonAccent.withValues(alpha: 0.15),
-              blurRadius: 32,
+              color: AppColors.neonAccent.withValues(alpha: 0.3),
+              blurRadius: 20,
               offset: const Offset(0, 8),
             ),
           ],
@@ -199,17 +212,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Text(
               _currentPage == 2 ? 'GET STARTED' : 'NEXT',
               style: GoogleFonts.spaceGrotesk(
-                fontSize: 16,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 3,
+                letterSpacing: 2,
                 color: AppColors.onPrimary,
               ),
             ),
             const SizedBox(width: 8),
             Icon(
-              _currentPage == 2 ? Icons.check : Icons.arrow_forward,
+              _currentPage == 2 ? Icons.check_circle : Icons.arrow_forward,
               color: AppColors.onPrimary,
-              size: 20,
+              size: 18,
             ),
           ],
         ),
