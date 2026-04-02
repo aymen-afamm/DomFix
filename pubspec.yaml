@@ -27,6 +27,6 @@ flutter:
   uses-material-design: true
   
   assets:
-    - assets/images/image1.json
-    - assets/images/image2.json
-    - assets/images/image3.json
+    - assets/images/Live chatbot.json
+    - assets/images/Electrician.json
+    - assets/images/Automao casa externa.json

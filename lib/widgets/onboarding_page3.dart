@@ -31,11 +31,24 @@ class OnboardingPage3 extends StatelessWidget {
   Widget _buildAnimation() {
     return SizedBox(
       height: 250,
-      child: Lottie.asset(
-        'assets/images/image3.json',
-        fit: BoxFit.contain,
-        repeat: true,
-        animate: true,
+      child: Center(
+        child: Lottie.asset(
+          'assets/images/Automao casa externa.json',
+          fit: BoxFit.contain,
+          repeat: true,
+          animate: true,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              height: 250,
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.home_outlined,
+                size: 100,
+                color: AppColors.primaryContainer,
+              ),
+            );
+          },
+        ),
       ),
     );
   }

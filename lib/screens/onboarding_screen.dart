@@ -57,48 +57,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          _buildMeshBackground(),
-          SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(),
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    onPageChanged: _onPageChanged,
-                    children: const [
-                      OnboardingPage1(),
-                      OnboardingPage2(),
-                      OnboardingPage3(),
-                    ],
-                  ),
-                ),
-                _buildFooter(),
-              ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: _onPageChanged,
+                children: const [
+                  OnboardingPage1(),
+                  OnboardingPage2(),
+                  OnboardingPage3(),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMeshBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        gradient: RadialGradient(
-          center: const Alignment(0, -0.5),
-          radius: 1.5,
-          colors: [
-            AppColors.primaryContainer.withValues(alpha: 0.03),
-            AppColors.background,
+            _buildFooter(),
           ],
         ),
       ),
     );
   }
+
+
 
   Widget _buildHeader() {
     return Padding(
@@ -189,14 +170,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.primaryContainer,
-              AppColors.primaryContainer.withValues(alpha: 0.8),
-            ],
-          ),
+          color: AppColors.primaryContainer,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
