@@ -2,28 +2,94 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import '../services/auth_service.dart';
-import '../widgets/logo_painter.dart';
-import 'register_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _authService = AuthService();
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _agreeToTerms = false;
   bool _isLoading = false;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleRegister() async {
+    if (_nameController.text.isEmpty ||
+        _emailController.text.isEmpty ||
+        _passwordController.text.isEmpty ||
+        _confirmPasswordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill all fields'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Passwords do not match'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please agree to Terms of Service and Privacy Policy'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await _authService.registerWithEmailPassword(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create account: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _handleGoogleSignIn() async {
@@ -52,49 +118,15 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _handleEmailSignIn() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter email and password'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-    setState(() => _isLoading = true);
-    try {
-      await _authService.signInWithEmailPassword(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Successfully signed in!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to sign in: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _navigateToLogin() {
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     return Scaffold(
       backgroundColor: AppColors.background,
       resizeToAvoidBottomInset: false,
@@ -102,8 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
         children: [
           _buildTopGlow(),
           SafeArea(
-            child: SizedBox(
-              height: screenHeight,
+            child: SingleChildScrollView(
               child: Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: screenWidth * 0.06,
@@ -112,25 +143,29 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    SizedBox(height: screenHeight * 0.01),
+                    SizedBox(height: screenHeight * 0.03),
                     _buildLogo(),
-                    SizedBox(height: screenHeight * 0.025),
+                    SizedBox(height: screenHeight * 0.04),
                     _buildTitle(),
-                    SizedBox(height: screenHeight * 0.035),
+                    SizedBox(height: screenHeight * 0.04),
+                    _buildNameField(),
+                    SizedBox(height: screenHeight * 0.02),
                     _buildEmailField(),
-                    SizedBox(height: screenHeight * 0.015),
+                    SizedBox(height: screenHeight * 0.02),
                     _buildPasswordField(),
-                    SizedBox(height: screenHeight * 0.008),
-                    _buildForgotPassword(),
-                    SizedBox(height: screenHeight * 0.035),
-                    _buildSignInButton(),
+                    SizedBox(height: screenHeight * 0.02),
+                    _buildConfirmPasswordField(),
+                    SizedBox(height: screenHeight * 0.025),
+                    _buildTermsCheckbox(),
+                    SizedBox(height: screenHeight * 0.03),
+                    _buildCreateAccountButton(),
                     SizedBox(height: screenHeight * 0.025),
                     _buildDivider(),
                     SizedBox(height: screenHeight * 0.025),
                     _buildGoogleButton(),
-                    const Spacer(),
-                    _buildCreateAccount(),
-                    SizedBox(height: screenHeight * 0.015),
+                    SizedBox(height: screenHeight * 0.03),
+                    _buildSignInLink(),
+                    SizedBox(height: screenHeight * 0.02),
                   ],
                 ),
               ),
@@ -165,52 +200,36 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildLogo() {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final scaleFactor = screenHeight < 700 ? 0.85 : 1.0;
-    
-    return Column(
-      children: [
-        SizedBox(
-          width: 48 * scaleFactor,
-          height: 34 * scaleFactor,
-          child: CustomPaint(painter: LogoPainter()),
-        ),
-        SizedBox(height: 6 * scaleFactor),
-        Text(
-          'DOMFIX',
-          style: GoogleFonts.spaceGrotesk(
-            fontSize: 12 * scaleFactor,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 5,
-            color: AppColors.primaryContainer,
-          ),
-        ),
-      ],
+    return Text(
+      'DOMFIX',
+      style: GoogleFonts.spaceGrotesk(
+        fontSize: 20,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 6,
+        color: AppColors.primaryContainer,
+      ),
     );
   }
 
   Widget _buildTitle() {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final scaleFactor = screenHeight < 700 ? 0.85 : 1.0;
-    
     return Column(
       children: [
         Text(
-          'Welcome Back',
+          'Create Account',
           textAlign: TextAlign.center,
           style: GoogleFonts.spaceGrotesk(
-            fontSize: 28 * scaleFactor,
+            fontSize: 32,
             fontWeight: FontWeight.w800,
             color: AppColors.onSurface,
             letterSpacing: -0.5,
           ),
         ),
-        SizedBox(height: 6 * scaleFactor),
+        const SizedBox(height: 8),
         Text(
-          'Sign in to continue',
+          'Join DOMFIX for smart home solutions',
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
-            fontSize: 14 * scaleFactor,
+            fontSize: 14,
             color: AppColors.onSurfaceVariant,
           ),
         ),
@@ -218,24 +237,79 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget _buildNameField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Full Name',
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.onSurface,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerHighest.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: TextField(
+            controller: _nameController,
+            style: GoogleFonts.inter(
+              color: AppColors.onSurface,
+              fontSize: 14,
+            ),
+            decoration: InputDecoration(
+              hintText: 'John Doe',
+              hintStyle: GoogleFonts.inter(
+                color: AppColors.onSurfaceVariant.withValues(alpha: 0.5),
+                fontSize: 14,
+              ),
+              prefixIcon: Icon(
+                Icons.person_outline_rounded,
+                color: AppColors.onSurfaceVariant,
+                size: 20,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: AppColors.primaryContainer,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 18,
+                horizontal: 16,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildEmailField() {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final scaleFactor = screenHeight < 700 ? 0.9 : 1.0;
-    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Email',
           style: GoogleFonts.inter(
-            fontSize: 13 * scaleFactor,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
             color: AppColors.onSurface,
           ),
         ),
-        SizedBox(height: 6 * scaleFactor),
+        const SizedBox(height: 6),
         Container(
-          height: 52 * scaleFactor,
+          height: 56,
           decoration: BoxDecoration(
             color: AppColors.surfaceContainerHighest.withValues(alpha: 0.55),
             borderRadius: BorderRadius.circular(14),
@@ -270,7 +344,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               contentPadding: const EdgeInsets.symmetric(
-                vertical: 16,
+                vertical: 18,
                 horizontal: 16,
               ),
             ),
@@ -281,23 +355,20 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildPasswordField() {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final scaleFactor = screenHeight < 700 ? 0.9 : 1.0;
-    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Password',
           style: GoogleFonts.inter(
-            fontSize: 13 * scaleFactor,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
             color: AppColors.onSurface,
           ),
         ),
-        SizedBox(height: 6 * scaleFactor),
+        const SizedBox(height: 6),
         Container(
-          height: 52 * scaleFactor,
+          height: 56,
           decoration: BoxDecoration(
             color: AppColors.surfaceContainerHighest.withValues(alpha: 0.55),
             borderRadius: BorderRadius.circular(14),
@@ -344,7 +415,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               contentPadding: const EdgeInsets.symmetric(
-                vertical: 16,
+                vertical: 18,
                 horizontal: 16,
               ),
             ),
@@ -354,37 +425,139 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildForgotPassword() {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final scaleFactor = screenHeight < 700 ? 0.9 : 1.0;
-    
-    return Align(
-      alignment: Alignment.centerRight,
-      child: GestureDetector(
-        onTap: () {},
-        child: Text(
-          'Forgot Password?',
+  Widget _buildConfirmPasswordField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Confirm Password',
           style: GoogleFonts.inter(
-            fontSize: 13 * scaleFactor,
-            fontWeight: FontWeight.w500,
-            color: AppColors.primaryContainer,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.onSurface,
           ),
         ),
-      ),
+        const SizedBox(height: 6),
+        Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerHighest.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: TextField(
+            controller: _confirmPasswordController,
+            obscureText: _obscureConfirmPassword,
+            style: GoogleFonts.inter(
+              color: AppColors.onSurface,
+              fontSize: 14,
+            ),
+            decoration: InputDecoration(
+              hintText: '••••••••',
+              hintStyle: GoogleFonts.inter(
+                color: AppColors.onSurfaceVariant.withValues(alpha: 0.5),
+                fontSize: 14,
+              ),
+              prefixIcon: Icon(
+                Icons.lock_outline_rounded,
+                color: AppColors.onSurfaceVariant,
+                size: 20,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureConfirmPassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: AppColors.onSurfaceVariant,
+                  size: 20,
+                ),
+                onPressed: () {
+                  setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                },
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: AppColors.primaryContainer,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 18,
+                horizontal: 16,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildSignInButton() {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final buttonHeight = screenHeight < 700 ? 50.0 : 54.0;
-    final scaleFactor = screenHeight < 700 ? 0.9 : 1.0;
-    
+  Widget _buildTermsCheckbox() {
+    return Row(
+      children: [
+        SizedBox(
+          width: 24,
+          height: 24,
+          child: Checkbox(
+            value: _agreeToTerms,
+            onChanged: (value) {
+              setState(() => _agreeToTerms = value ?? false);
+            },
+            activeColor: AppColors.primaryContainer,
+            checkColor: AppColors.onPrimary,
+            side: BorderSide(
+              color: AppColors.onSurfaceVariant.withValues(alpha: 0.4),
+              width: 1.5,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: AppColors.onSurfaceVariant,
+              ),
+              children: [
+                const TextSpan(text: 'I agree to the '),
+                TextSpan(
+                  text: 'Terms of Service',
+                  style: TextStyle(
+                    color: AppColors.primaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const TextSpan(text: ' and '),
+                TextSpan(
+                  text: 'Privacy Policy',
+                  style: TextStyle(
+                    color: AppColors.primaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCreateAccountButton() {
     return GestureDetector(
-      onTap: _isLoading ? null : _handleEmailSignIn,
+      onTap: _isLoading ? null : _handleRegister,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         width: double.infinity,
-        height: buttonHeight,
+        height: 56,
         decoration: BoxDecoration(
           color: _isLoading ? Colors.grey : AppColors.primaryContainer,
           borderRadius: BorderRadius.circular(32),
@@ -392,7 +565,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ? []
               : [
                   BoxShadow(
-                    color: AppColors.primaryContainer.withValues(alpha: 0.25),
+                    color: AppColors.primaryContainer.withValues(alpha: 0.3),
                     blurRadius: 20,
                     offset: const Offset(0, 6),
                   ),
@@ -412,9 +585,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Sign In',
+                      'Create Account',
                       style: GoogleFonts.spaceGrotesk(
-                        fontSize: 16 * scaleFactor,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: AppColors.onPrimary,
                       ),
@@ -423,7 +596,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Icon(
                       Icons.arrow_forward_rounded,
                       color: AppColors.onPrimary,
-                      size: 20 * scaleFactor,
+                      size: 20,
                     ),
                   ],
                 ),
@@ -433,9 +606,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildDivider() {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final scaleFactor = screenHeight < 700 ? 0.9 : 1.0;
-    
     return Row(
       children: [
         Expanded(
@@ -447,9 +617,9 @@ class _LoginScreenState extends State<LoginScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Text(
-            'or continue with',
+            'or',
             style: GoogleFonts.inter(
-              fontSize: 12 * scaleFactor,
+              fontSize: 13,
               color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
             ),
           ),
@@ -465,15 +635,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildGoogleButton() {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final buttonHeight = screenHeight < 700 ? 50.0 : 54.0;
-    final scaleFactor = screenHeight < 700 ? 0.9 : 1.0;
-    
     return GestureDetector(
       onTap: _isLoading ? null : _handleGoogleSignIn,
       child: Container(
         width: double.infinity,
-        height: buttonHeight,
+        height: 56,
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerHighest.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(14),
@@ -494,7 +660,7 @@ class _LoginScreenState extends State<LoginScreen> {
             Text(
               'Continue with Google',
               style: GoogleFonts.inter(
-                fontSize: 14 * scaleFactor,
+                fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: AppColors.onSurface,
               ),
@@ -505,27 +671,19 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildCreateAccount() {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final scaleFactor = screenHeight < 700 ? 0.9 : 1.0;
-    
+  Widget _buildSignInLink() {
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const RegisterScreen()),
-        );
-      },
+      onTap: _navigateToLogin,
       child: RichText(
         text: TextSpan(
           style: GoogleFonts.inter(
-            fontSize: 13 * scaleFactor,
+            fontSize: 14,
             color: AppColors.onSurfaceVariant,
           ),
           children: [
-            const TextSpan(text: "Don't have an account? "),
+            const TextSpan(text: 'Already have an account? '),
             TextSpan(
-              text: 'Create Account',
+              text: 'Sign In',
               style: TextStyle(
                 color: AppColors.primaryContainer,
                 fontWeight: FontWeight.w600,
@@ -537,4 +695,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
