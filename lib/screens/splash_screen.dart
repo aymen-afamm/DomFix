@@ -5,6 +5,7 @@ import '../widgets/logo_painter.dart';
 import '../services/preferences_service.dart';
 import 'onboarding_screen.dart';
 import 'login_screen.dart';
+import 'home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -43,11 +44,17 @@ class _SplashScreenState extends State<SplashScreen>
     
     if (!mounted) return;
 
+    final isLoggedIn = await PreferencesService.isLoggedIn();
     final isFirstLaunch = await PreferencesService.isFirstLaunch();
 
     if (!mounted) return;
 
-    if (isFirstLaunch) {
+    if (isLoggedIn) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } else if (isFirstLaunch) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
