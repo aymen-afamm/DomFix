@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import '../services/preferences_service.dart';
 import 'main_screen.dart';
+import 'onboarding/technician_onboarding_flow.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -63,15 +64,37 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> with SingleTi
     HapticFeedback.mediumImpact();
 
     await PreferencesService.setUserRole(_selectedRole!);
-    
+
     if (!mounted) return;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const MainScreen(initialPage: 0),
-      ),
-    );
+    if (_selectedRole == 'technician') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => Scaffold(
+            backgroundColor: AppColors.background,
+            body: TechnicianOnboardingFlow(
+              onComplete: (data) {
+                // TODO: save data to Firestore / backend, then go to MainScreen
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const MainScreen(initialPage: 0),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const MainScreen(initialPage: 0),
+        ),
+      );
+    }
   }
 
   void _selectRole(String role) {
