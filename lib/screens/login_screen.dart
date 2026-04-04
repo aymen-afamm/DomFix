@@ -5,7 +5,7 @@ import '../services/auth_service.dart';
 import '../services/preferences_service.dart';
 import '../widgets/logo_painter.dart';
 import 'register_screen.dart';
-import 'home_screen.dart';
+import 'role_selection_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await PreferencesService.setLoggedIn(true);
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
         );
       }
     } catch (e) {
@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await PreferencesService.setLoggedIn(true);
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
         );
       }
     } catch (e) {

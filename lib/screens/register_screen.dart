@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/preferences_service.dart';
-import 'home_screen.dart';
+import 'role_selection_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -76,7 +76,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         await PreferencesService.setLoggedIn(true);
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
         );
       }
     } catch (e) {
@@ -101,7 +101,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         await PreferencesService.setLoggedIn(true);
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
         );
       }
     } catch (e) {
