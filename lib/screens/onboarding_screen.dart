@@ -4,7 +4,7 @@ import '../theme/app_colors.dart';
 import '../widgets/onboarding_page1.dart';
 import '../widgets/onboarding_page2.dart';
 import '../widgets/onboarding_page3.dart';
-import '../services/preferences_service.dart';
+import '../services/local_storage_service.dart';
 import 'login_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -37,7 +37,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         curve: Curves.easeInOut,
       );
     } else {
-      PreferencesService.completeOnboarding();
+      LocalStorageService.completeOnboarding();
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -46,7 +46,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _skip() {
-    PreferencesService.completeOnboarding();
+    LocalStorageService.completeOnboarding();
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),

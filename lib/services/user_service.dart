@@ -1,74 +1,110 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
-/// Handles all Firestore operations for the `users` collection.
-/// Firebase is the single source of truth for user data.
 class UserService {
-  static final FirebaseFirestore _db = FirebaseFirestore.instance;
-  static const String _collection = 'users';
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final String _usersCollection = 'users';
 
-  // ─── Create ───────────────────────────────────────────────────────────────
-
-  /// Creates a new user document in Firestore after registration.
-  /// Does NOT overwrite if the document already exists (safe for Google sign-in).
-  static Future<void> createUserIfNotExists(String uid, String email) async {
+  // Create user document in Firestore
+  Future<void> createUser({
+    required String uid,
+    required String email,
+    required String role,
+    bool onboardingDone = false,
+  }) async {
     try {
-      final docRef = _db.collection(_collection).doc(uid);
-      final snapshot = await docRef.get();
-
-      if (!snapshot.exists) {
-        await docRef.set({
-          'uid': uid,
-          'email': email,
-          'role': null,
-          'onboarding_done': false,
-          'created_at': FieldValue.serverTimestamp(),
-        });
-      }
+      await _firestore.collection(_usersCollection).doc(uid).set({
+        'uid': uid,
+        'email': email,
+        'role': role,
+        'onboarding_done': onboardingDone,
+        'created_at': FieldValue.serverTimestamp(),
+      });
     } catch (e) {
-      debugPrint('[UserService] createUserIfNotExists error: $e');
+      debugPrint('Error creating user: $e');
       rethrow;
     }
   }
 
-  // ─── Read ─────────────────────────────────────────────────────────────────
-
-  /// Fetches user data from Firestore.
-  /// Returns null if the document does not exist.
-  static Future<Map<String, dynamic>?> getUserData(String uid) async {
+  // Get user data from Firestore
+  Future<Map<String, dynamic>?> getUserData(String uid) async {
     try {
-      final snapshot = await _db.collection(_collection).doc(uid).get();
-      if (snapshot.exists) {
-        return snapshot.data();
+      final doc = await _firestore.collection(_usersCollection).doc(uid).get();
+      if (doc.exists) {
+        return doc.data();
       }
       return null;
     } catch (e) {
-      debugPrint('[UserService] getUserData error: $e');
-      return null;
-    }
-  }
-
-  // ─── Update ───────────────────────────────────────────────────────────────
-
-  /// Saves the selected role to Firestore.
-  static Future<void> updateRole(String uid, String role) async {
-    try {
-      await _db.collection(_collection).doc(uid).update({'role': role});
-    } catch (e) {
-      debugPrint('[UserService] updateRole error: $e');
+      debugPrint('Error getting user data: $e');
       rethrow;
     }
   }
 
-  /// Marks onboarding as complete/incomplete in Firestore.
-  static Future<void> updateOnboardingDone(String uid, bool done) async {
+  // Update user role
+  Future<void> updateUserRole(String uid, String role) async {
     try {
-      await _db
-          .collection(_collection)
-          .doc(uid)
-          .update({'onboarding_done': done});
+      await _firestore.collection(_usersCollection).doc(uid).update({
+        'role': role,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
     } catch (e) {
-      debugPrint('[UserService] updateOnboardingDone error: $e');
+      debugPrint('Error updating user role: $e');
+      rethrow;
+    }
+  }
+
+  // Update onboarding status
+  Future<void> updateOnboardingStatus(String uid, bool done) async {
+    try {
+      await _firestore.collection(_usersCollection).doc(uid).update({
+        'onboarding_done': done,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error updating onboarding status: $e');
+      rethrow;
+    }
+  }
+
+  // Check if user document exists
+  Future<bool> userExists(String uid) async {
+    try {
+      final doc = await _firestore.collection(_usersCollection).doc(uid).get();
+      return doc.exists;
+    } catch (e) {
+      debugPrint('Error checking user existence: $e');
+      return false;
+    }
+  }
+
+  // Get user role
+  Future<String?> getUserRole(String uid) async {
+    try {
+      final userData = await getUserData(uid);
+      return userData?['role'] as String?;
+    } catch (e) {
+      debugPrint('Error getting user role: $e');
+      return null;
+    }
+  }
+
+  // Get onboarding status
+  Future<bool> getOnboardingStatus(String uid) async {
+    try {
+      final userData = await getUserData(uid);
+      return userData?['onboarding_done'] as bool? ?? false;
+    } catch (e) {
+      debugPrint('Error getting onboarding status: $e');
+      return false;
+    }
+  }
+
+  // Delete user data (for logout/account deletion)
+  Future<void> deleteUser(String uid) async {
+    try {
+      await _firestore.collection(_usersCollection).doc(uid).delete();
+    } catch (e) {
+      debugPrint('Error deleting user: $e');
       rethrow;
     }
   }

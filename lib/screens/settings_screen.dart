@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import '../services/auth_service.dart';
-import '../services/preferences_service.dart';
-import '../services/navigation_service.dart';
+import '../services/local_storage_service.dart';
+import '../services/firebase_navigation_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -58,7 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
 
     if (confirm == true && mounted) {
       await _authService.signOut();
-      await PreferencesService.logout();
+      await LocalStorageService.clearAll();
       if (mounted) {
         await NavigationService.logout(context);
       }

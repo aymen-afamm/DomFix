@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_colors.dart';
 import '../widgets/logo_painter.dart';
-import '../services/preferences_service.dart';
-import '../services/navigation_service.dart';
+import '../services/local_storage_service.dart';
+import '../services/firebase_navigation_service.dart';
 import 'onboarding_screen.dart';
 import 'login_screen.dart';
-import 'role_selection_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -45,39 +45,33 @@ class _SplashScreenState extends State<SplashScreen>
     
     if (!mounted) return;
 
-    final isLoggedIn = await PreferencesService.isLoggedIn();
-    final isFirstLaunch = await PreferencesService.isFirstLaunch();
-    final userRole = await PreferencesService.getUserRole();
-
-    if (!mounted) return;
-
-    // Not logged in
-    if (!isLoggedIn) {
-      if (isFirstLaunch) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        );
-      }
-      return;
-    }
-
-    // Logged in but no role selected
-    if (userRole == null || userRole.isEmpty) {
+    // Check if first launch (for app onboarding)
+    final isFirstLaunch = await LocalStorageService.isFirstLaunch();
+    
+    if (isFirstLaunch) {
+      // Show app onboarding first time
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
       );
       return;
     }
 
-    // Logged in with role - use navigation service
-    await NavigationService.navigateBasedOnRole(context);
+    // Check Firebase authentication status
+    final user = FirebaseAuth.instance.currentUser;
+    
+    if (!mounted) return;
+
+    if (user == null) {
+      // Not logged in - go to login
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    } else {
+      // Logged in - use Firebase navigation service
+      await NavigationService.navigateBasedOnAuth(context);
+    }
   }
 
   @override

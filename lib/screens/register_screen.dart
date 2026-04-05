@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import '../services/auth_service.dart';
-import '../services/preferences_service.dart';
+import '../services/user_service.dart';
 import 'role_selection_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -18,6 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _authService = AuthService();
+  final _userService = UserService();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
@@ -68,12 +69,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await _authService.registerWithEmailPassword(
+      final userCredential = await _authService.registerWithEmailPassword(
         _emailController.text.trim(),
         _passwordController.text,
       );
+      
+      // Create user document in Firestore (without role yet)
+      await _userService.createUser(
+        uid: userCredential.user!.uid,
+        email: _emailController.text.trim(),
+        role: '', // Empty - will be set in role selection
+      );
+      
       if (mounted) {
-        await PreferencesService.setLoggedIn(true);
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
@@ -98,7 +106,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final userCredential = await _authService.signInWithGoogle();
       if (userCredential != null && mounted) {
-        await PreferencesService.setLoggedIn(true);
+        // Check if user exists in Firestore
+        final userExists = await _userService.userExists(userCredential.user!.uid);
+        
+        if (!userExists) {
+          // New user - create document without role
+          await _userService.createUser(
+            uid: userCredential.user!.uid,
+            email: userCredential.user!.email ?? '',
+            role: '', // Empty - will be set in role selection
+          );
+        }
+        
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),

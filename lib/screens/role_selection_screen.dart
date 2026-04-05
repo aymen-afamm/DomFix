@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_colors.dart';
-import '../services/preferences_service.dart';
-import '../services/navigation_service.dart';
+import '../services/user_service.dart';
+import '../services/local_storage_service.dart';
 import 'client_home_screen.dart';
+import 'technician_home_screen.dart';
+import 'onboarding/technician_onboarding_flow.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -19,6 +22,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> with SingleTi
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  final _userService = UserService();
 
   @override
   void initState() {
@@ -63,17 +67,63 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> with SingleTi
     setState(() => _isLoading = true);
     HapticFeedback.mediumImpact();
 
-    await PreferencesService.setUserRole(_selectedRole!);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('No user logged in');
 
-    if (!mounted) return;
+      // Save role to Firestore
+      await _userService.updateUserRole(user.uid, _selectedRole!);
+      
+      // Save to local storage
+      await LocalStorageService.setUserRole(_selectedRole!);
+      await LocalStorageService.setLoggedIn(true);
 
-    if (_selectedRole == 'client') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const ClientHomeScreen()),
-      );
-    } else {
-      await NavigationService.navigateBasedOnRole(context);
+      if (!mounted) return;
+
+      if (_selectedRole == 'client') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const ClientHomeScreen()),
+        );
+      } else {
+        // Technician - go to onboarding
+        // Capture context before async operation
+        final navigatorContext = context;
+        Navigator.pushReplacement(
+          navigatorContext,
+          MaterialPageRoute(
+            builder: (buildContext) => Scaffold(
+              backgroundColor: AppColors.background,
+              body: TechnicianOnboardingFlow(
+                onComplete: (data) async {
+                  // Update Firestore
+                  await _userService.updateOnboardingStatus(user.uid, true);
+                  // Update local storage
+                  await LocalStorageService.setOnboardingDone(true);
+                  // Use buildContext from MaterialPageRoute builder
+                  if (buildContext.mounted) {
+                    Navigator.pushReplacement(
+                      buildContext,
+                      MaterialPageRoute(builder: (_) => const TechnicianHomeScreen()),
+                    );
+                  }
+                },
+              ),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
-import 'ai_chat_screen.dart';
-import 'find_pros_screen.dart';
+import 'main_layout.dart';
 
 class HomeScreenContent extends StatefulWidget {
   const HomeScreenContent({super.key});
@@ -263,10 +262,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
   Widget _buildFindProCard() {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const FindProsScreen()),
-        );
+        MainLayoutScope.maybeOf(context)?.selectTab(2);
       },
       child: Container(
         padding: const EdgeInsets.all(20),

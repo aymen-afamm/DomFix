@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import '../services/auth_service.dart';
-import '../services/preferences_service.dart';
-import '../services/navigation_service.dart';
+import '../services/user_service.dart';
+import '../services/firebase_navigation_service.dart';
 import '../widgets/logo_painter.dart';
 import 'register_screen.dart';
 
@@ -18,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = AuthService();
+  final _userService = UserService();
   bool _obscurePassword = true;
   bool _isLoading = false;
 
@@ -33,8 +34,21 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final userCredential = await _authService.signInWithGoogle();
       if (userCredential != null && mounted) {
-        await PreferencesService.setLoggedIn(true);
-        await NavigationService.navigateBasedOnRole(context);
+        // Check if user exists in Firestore
+        final userExists = await _userService.userExists(userCredential.user!.uid);
+        
+        if (!userExists) {
+          // New user - create document without role (will select role next)
+          await _userService.createUser(
+            uid: userCredential.user!.uid,
+            email: userCredential.user!.email ?? '',
+            role: '', // Empty role - will be set in role selection
+          );
+        }
+        
+        if (mounted) {
+          await NavigationService.navigateBasedOnAuth(context);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -62,13 +76,14 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      await _authService.signInWithEmailPassword(
+      final userCredential = await _authService.signInWithEmailPassword(
         _emailController.text.trim(),
         _passwordController.text,
       );
+      
       if (mounted) {
-        await PreferencesService.setLoggedIn(true);
-        await NavigationService.navigateBasedOnRole(context);
+        // Navigate based on Firebase data
+        await NavigationService.navigateBasedOnAuth(context);
       }
     } catch (e) {
       if (mounted) {
