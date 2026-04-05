@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_colors.dart';
+import 'nearby_technicians_map_screen.dart';
 
 class FindProsScreenContent extends StatefulWidget {
   const FindProsScreenContent({super.key});
@@ -141,7 +142,17 @@ class _FindProsScreenContentState extends State<FindProsScreenContent>
             top: 0,
             left: 0,
             right: 0,
-            child: _FrostedTopBar(topInset: topInset, height: headerBody),
+            child: _FrostedTopBar(
+              topInset: topInset,
+              height: headerBody,
+              onOpenNearbyMap: () {
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const NearbyTechniciansMapScreen(),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -308,10 +319,15 @@ class _FindProsScreenContentState extends State<FindProsScreenContent>
 }
 
 class _FrostedTopBar extends StatelessWidget {
-  const _FrostedTopBar({required this.topInset, required this.height});
+  const _FrostedTopBar({
+    required this.topInset,
+    required this.height,
+    required this.onOpenNearbyMap,
+  });
 
   final double topInset;
   final double height;
+  final VoidCallback onOpenNearbyMap;
 
   @override
   Widget build(BuildContext context) {
@@ -343,13 +359,27 @@ class _FrostedTopBar extends StatelessWidget {
                     ),
                   ],
                 ),
-                IconButton(
-                  onPressed: () {},
-                  icon: Icon(
-                    Icons.notifications_none_rounded,
-                    color: const Color(0xFFE0E2EA),
-                    size: 26,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Nearby map',
+                      onPressed: onOpenNearbyMap,
+                      icon: Icon(
+                        Icons.map_rounded,
+                        color: AppColors.neonAccent,
+                        size: 26,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () {},
+                      icon: Icon(
+                        Icons.notifications_none_rounded,
+                        color: const Color(0xFFE0E2EA),
+                        size: 26,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

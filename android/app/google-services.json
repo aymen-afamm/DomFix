@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "739834391344",
+    "firebase_url": "https://domotique-c7923-default-rtdb.firebaseio.com",
     "project_id": "domotique-c7923",
     "storage_bucket": "domotique-c7923.firebasestorage.app"
   },
