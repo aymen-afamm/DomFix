@@ -38,11 +38,9 @@ class _LoginScreenState extends State<LoginScreen> {
         final userExists = await _userService.userExists(userCredential.user!.uid);
         
         if (!userExists) {
-          // New user - create document without role (will select role next)
-          await _userService.createUser(
+          await _userService.ensureUserDocument(
             uid: userCredential.user!.uid,
             email: userCredential.user!.email ?? '',
-            role: '', // Empty role - will be set in role selection
           );
         }
         

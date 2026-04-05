@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import '../screens/login_screen.dart';
 import '../screens/role_selection_screen.dart';
 import '../screens/client_home_screen.dart';
@@ -12,15 +13,15 @@ import 'local_storage_service.dart';
 class NavigationService {
   static final UserService _userService = UserService();
 
-  // Navigate based on Firebase authentication and Firestore data
+  /// Single entry: Firebase session + Firestore `users/{uid}`.
   static Future<void> navigateBasedOnAuth(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;
 
     if (!context.mounted) return;
 
-    // Not logged in - go to login
     if (user == null) {
       await LocalStorageService.clearAll();
+      if (!context.mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -28,13 +29,11 @@ class NavigationService {
       return;
     }
 
-    // User is logged in - fetch data from Firestore
     try {
       final userData = await _userService.getUserData(user.uid);
 
       if (!context.mounted) return;
 
-      // User document doesn't exist - need to select role
       if (userData == null) {
         Navigator.pushReplacement(
           context,
@@ -43,48 +42,41 @@ class NavigationService {
         return;
       }
 
-      // Get role and onboarding status from Firestore
-      final role = userData['role'] as String?;
-      final onboardingDone = userData['onboarding_done'] as bool? ?? false;
+      final role = UserService.parseRole(userData);
+      final onboardingDone = UserService.parseOnboardingCompleted(userData);
 
-      // Save to local storage for quick access
-      if (role != null) {
-        await LocalStorageService.saveUserSession(
-          role: role,
-          onboardingDone: onboardingDone,
-        );
-      }
+      await LocalStorageService.setLoggedIn(true);
 
       if (!context.mounted) return;
 
-      // Navigate based on role
-      if (role == null || role.isEmpty) {
+      if (role == null) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
         );
-      } else if (role == 'client') {
+        return;
+      }
+
+      if (role == 'client') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const ClientHomeScreen()),
         );
-      } else if (role == 'technician') {
+        return;
+      }
+
+      if (role == 'technician') {
         if (!onboardingDone) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => Scaffold(
+              builder: (routeContext) => Scaffold(
                 backgroundColor: AppColors.background,
                 body: TechnicianOnboardingFlow(
                   onComplete: (data) async {
-                    // Update Firestore
-                    await _userService.updateOnboardingStatus(user.uid, true);
-                    // Update local storage
-                    await LocalStorageService.setOnboardingDone(true);
-                    if (!context.mounted) return;
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (_) => const TechnicianHomeScreen()),
+                    await _onTechnicianOnboardingComplete(
+                      routeContext,
+                      user.uid,
                     );
                   },
                 ),
@@ -97,11 +89,22 @@ class NavigationService {
             MaterialPageRoute(builder: (_) => const TechnicianHomeScreen()),
           );
         }
+        return;
       }
-    } catch (e) {
-      debugPrint('Error navigating based on auth: $e');
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+      );
+    } catch (e, st) {
+      debugPrint('navigateBasedOnAuth error: $e\n$st');
       if (!context.mounted) return;
-      // On error, go to login
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not load your profile. Check connection and try again.'),
+          backgroundColor: Colors.red.shade800,
+        ),
+      );
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -109,13 +112,39 @@ class NavigationService {
     }
   }
 
-  // Logout
+  static Future<void> _onTechnicianOnboardingComplete(
+    BuildContext routeContext,
+    String uid,
+  ) async {
+    try {
+      await _userService.updateOnboardingStatus(uid, true);
+    } catch (e, st) {
+      debugPrint('Onboarding Firestore update failed: $e\n$st');
+      if (routeContext.mounted) {
+        ScaffoldMessenger.of(routeContext).showSnackBar(
+          SnackBar(
+            content: Text('Could not save onboarding: $e'),
+            backgroundColor: Colors.red.shade800,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!routeContext.mounted) return;
+
+    Navigator.of(routeContext, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const TechnicianHomeScreen()),
+      (route) => false,
+    );
+  }
+
   static Future<void> logout(BuildContext context) async {
     await FirebaseAuth.instance.signOut();
     await LocalStorageService.clearAll();
-    
+
     if (!context.mounted) return;
-    
+
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),

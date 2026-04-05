@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -17,8 +19,8 @@ import 'profile_audit_screen.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class TechnicianOnboardingFlow extends StatefulWidget {
-  /// Callback fired when the entire flow is complete.
-  final void Function(TechnicianOnboardingData data)? onComplete;
+  /// Fired when the flow is complete; awaited so Firestore + navigation can finish.
+  final Future<void> Function(TechnicianOnboardingData data)? onComplete;
 
   const TechnicianOnboardingFlow({super.key, this.onComplete});
 
@@ -49,10 +51,14 @@ class _TechnicianOnboardingFlowState extends State<TechnicianOnboardingFlow> {
         curve: Curves.easeInOut,
       );
     } else {
-      // Flow complete
       HapticFeedback.mediumImpact();
-      widget.onComplete?.call(_data);
+      unawaited(_invokeComplete(_data));
     }
+  }
+
+  Future<void> _invokeComplete(TechnicianOnboardingData data) async {
+    final cb = widget.onComplete;
+    if (cb != null) await cb(data);
   }
 
   void _goBack() {
@@ -115,7 +121,7 @@ class _TechnicianOnboardingFlowState extends State<TechnicianOnboardingFlow> {
           onBack: _goBack,
           onFinish: () {
             HapticFeedback.mediumImpact();
-            widget.onComplete?.call(_data);
+            unawaited(_invokeComplete(_data));
           },
         ),
       ],

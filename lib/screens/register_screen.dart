@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
-import 'role_selection_screen.dart';
+import '../services/firebase_navigation_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -74,18 +74,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _passwordController.text,
       );
       
-      // Create user document in Firestore (without role yet)
-      await _userService.createUser(
+      await _userService.ensureUserDocument(
         uid: userCredential.user!.uid,
         email: _emailController.text.trim(),
-        role: '', // Empty - will be set in role selection
+        name: _nameController.text.trim(),
       );
-      
+
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
-        );
+        await NavigationService.navigateBasedOnAuth(context);
       }
     } catch (e) {
       if (mounted) {
@@ -106,22 +102,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final userCredential = await _authService.signInWithGoogle();
       if (userCredential != null && mounted) {
-        // Check if user exists in Firestore
-        final userExists = await _userService.userExists(userCredential.user!.uid);
-        
+        final uid = userCredential.user!.uid;
+        final userExists = await _userService.userExists(uid);
+
         if (!userExists) {
-          // New user - create document without role
-          await _userService.createUser(
-            uid: userCredential.user!.uid,
+          await _userService.ensureUserDocument(
+            uid: uid,
             email: userCredential.user!.email ?? '',
-            role: '', // Empty - will be set in role selection
           );
         }
-        
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
-        );
+
+        await NavigationService.navigateBasedOnAuth(context);
       }
     } catch (e) {
       if (mounted) {

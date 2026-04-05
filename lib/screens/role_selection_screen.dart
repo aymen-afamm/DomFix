@@ -4,10 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_colors.dart';
 import '../services/user_service.dart';
-import '../services/local_storage_service.dart';
-import 'client_home_screen.dart';
-import 'technician_home_screen.dart';
-import 'onboarding/technician_onboarding_flow.dart';
+import '../services/firebase_navigation_service.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -16,7 +13,8 @@ class RoleSelectionScreen extends StatefulWidget {
   State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
 }
 
-class _RoleSelectionScreenState extends State<RoleSelectionScreen> with SingleTickerProviderStateMixin {
+class _RoleSelectionScreenState extends State<RoleSelectionScreen>
+    with SingleTickerProviderStateMixin {
   String? _selectedRole;
   bool _isLoading = false;
   late AnimationController _animationController;
@@ -31,16 +29,17 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> with SingleTi
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
-    
+
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
-    
+    ).animate(
+        CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
+
     _animationController.forward();
   }
 
@@ -71,48 +70,11 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> with SingleTi
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('No user logged in');
 
-      // Save role to Firestore
       await _userService.updateUserRole(user.uid, _selectedRole!);
-      
-      // Save to local storage
-      await LocalStorageService.setUserRole(_selectedRole!);
-      await LocalStorageService.setLoggedIn(true);
 
       if (!mounted) return;
 
-      if (_selectedRole == 'client') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const ClientHomeScreen()),
-        );
-      } else {
-        // Technician - go to onboarding
-        // Capture context before async operation
-        final navigatorContext = context;
-        Navigator.pushReplacement(
-          navigatorContext,
-          MaterialPageRoute(
-            builder: (buildContext) => Scaffold(
-              backgroundColor: AppColors.background,
-              body: TechnicianOnboardingFlow(
-                onComplete: (data) async {
-                  // Update Firestore
-                  await _userService.updateOnboardingStatus(user.uid, true);
-                  // Update local storage
-                  await LocalStorageService.setOnboardingDone(true);
-                  // Use buildContext from MaterialPageRoute builder
-                  if (buildContext.mounted) {
-                    Navigator.pushReplacement(
-                      buildContext,
-                      MaterialPageRoute(builder: (_) => const TechnicianHomeScreen()),
-                    );
-                  }
-                },
-              ),
-            ),
-          ),
-        );
-      }
+      await NavigationService.navigateBasedOnAuth(context);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
