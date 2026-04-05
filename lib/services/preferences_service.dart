@@ -1,62 +1,99 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Local storage helper using SharedPreferences.
+///
+/// IMPORTANT: SharedPreferences is used ONLY as a session cache.
+/// Firebase Firestore is the source of truth. Always sync from Firestore
+/// on app start or after login.
 class PreferencesService {
-  static const String _keyFirstLaunch = 'isFirstLaunch';
-  static const String _keyLoggedIn = 'isLoggedIn';
-  static const String _keyUserRole = 'userRole';
+  // ─── Keys (spec-aligned) ──────────────────────────────────────────────────
+  static const String _keyIsLoggedIn = 'is_logged_in';
+  static const String _keyUserRole = 'user_role';
+  static const String _keyOnboardingDone = 'onboarding_done';
+  static const String _keyFirstLaunch = 'isFirstLaunch'; // app intro screens
 
-  // Check if this is the first launch
-  static Future<bool> isFirstLaunch() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyFirstLaunch) ?? true;
-  }
+  // ─── is_logged_in ─────────────────────────────────────────────────────────
 
-  // Mark onboarding as completed
-  static Future<void> completeOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyFirstLaunch, false);
-  }
-
-  // Check if user is logged in
   static Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyLoggedIn) ?? false;
+    return prefs.getBool(_keyIsLoggedIn) ?? false;
   }
 
-  // Set user logged in state
   static Future<void> setLoggedIn(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyLoggedIn, value);
+    await prefs.setBool(_keyIsLoggedIn, value);
   }
 
-  // Get user role
+  // ─── user_role ────────────────────────────────────────────────────────────
+
   static Future<String?> getUserRole() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyUserRole);
   }
 
-  // Set user role
   static Future<void> setUserRole(String role) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyUserRole, role);
   }
 
-  // Check if user has selected a role
   static Future<bool> hasRole() async {
     final role = await getUserRole();
     return role != null && role.isNotEmpty;
   }
 
-  // Logout user
-  static Future<void> logout() async {
+  // ─── onboarding_done ──────────────────────────────────────────────────────
+
+  static Future<bool> isOnboardingDone() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyLoggedIn, false);
-    await prefs.remove(_keyUserRole);
+    return prefs.getBool(_keyOnboardingDone) ?? false;
   }
 
-  // Reset first launch (for testing)
-  static Future<void> resetFirstLaunch() async {
+  static Future<void> setOnboardingDone(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyFirstLaunch, true);
+    await prefs.setBool(_keyOnboardingDone, value);
   }
+
+  // ─── App intro (first launch) ─────────────────────────────────────────────
+
+  static Future<bool> isFirstLaunch() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyFirstLaunch) ?? true;
+  }
+
+  static Future<void> completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyFirstLaunch, false);
+  }
+
+  // ─── Sync helpers ─────────────────────────────────────────────────────────
+
+  /// Sync Firestore user data into local cache after login or app start.
+  static Future<void> syncFromFirestore({
+    required String role,
+    required bool onboardingDone,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyIsLoggedIn, true);
+    await prefs.setString(_keyUserRole, role);
+    await prefs.setBool(_keyOnboardingDone, onboardingDone);
+  }
+
+  // ─── Logout ───────────────────────────────────────────────────────────────
+
+  /// Clears all auth-related keys. Call on logout.
+  static Future<void> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyIsLoggedIn);
+    await prefs.remove(_keyUserRole);
+    await prefs.remove(_keyOnboardingDone);
+  }
+
+  // ─── Legacy aliases (backward-compat during migration) ────────────────────
+
+  /// @deprecated Use [isOnboardingDone]
+  static Future<bool> isOnboardingCompleted() => isOnboardingDone();
+
+  /// @deprecated Use [setOnboardingDone]
+  static Future<void> setOnboardingCompleted(bool value) =>
+      setOnboardingDone(value);
 }

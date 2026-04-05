@@ -3,10 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import '../widgets/logo_painter.dart';
 import '../services/preferences_service.dart';
+import '../services/navigation_service.dart';
 import 'onboarding_screen.dart';
 import 'login_screen.dart';
 import 'role_selection_screen.dart';
-import 'main_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -47,35 +47,37 @@ class _SplashScreenState extends State<SplashScreen>
 
     final isLoggedIn = await PreferencesService.isLoggedIn();
     final isFirstLaunch = await PreferencesService.isFirstLaunch();
-    final hasRole = await PreferencesService.hasRole();
+    final userRole = await PreferencesService.getUserRole();
 
     if (!mounted) return;
 
-    if (isLoggedIn && hasRole) {
-      // User is logged in and has selected a role
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainScreen()),
-      );
-    } else if (isLoggedIn && !hasRole) {
-      // User is logged in but hasn't selected a role
+    // Not logged in
+    if (!isLoggedIn) {
+      if (isFirstLaunch) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
+      return;
+    }
+
+    // Logged in but no role selected
+    if (userRole == null || userRole.isEmpty) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
       );
-    } else if (isFirstLaunch) {
-      // First time user
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-      );
-    } else {
-      // Returning user who is not logged in
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
+      return;
     }
+
+    // Logged in with role - use navigation service
+    await NavigationService.navigateBasedOnRole(context);
   }
 
   @override

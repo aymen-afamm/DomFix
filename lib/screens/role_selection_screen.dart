@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import '../services/preferences_service.dart';
-import 'main_screen.dart';
-import 'onboarding/technician_onboarding_flow.dart';
+import '../services/navigation_service.dart';
+import 'client_home_screen.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -67,33 +67,13 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> with SingleTi
 
     if (!mounted) return;
 
-    if (_selectedRole == 'technician') {
+    if (_selectedRole == 'client') {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => Scaffold(
-            backgroundColor: AppColors.background,
-            body: TechnicianOnboardingFlow(
-              onComplete: (data) {
-                // TODO: save data to Firestore / backend, then go to MainScreen
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MainScreen(initialPage: 0),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
+        MaterialPageRoute(builder: (_) => const ClientHomeScreen()),
       );
     } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const MainScreen(initialPage: 0),
-        ),
-      );
+      await NavigationService.navigateBasedOnRole(context);
     }
   }
 

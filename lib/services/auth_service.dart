@@ -47,6 +47,7 @@ class AuthService {
       _auth.signOut(),
       _googleSignIn.signOut(),
     ]);
+    await PreferencesService.clearAll();
   }
 
   // Sign in with email and password

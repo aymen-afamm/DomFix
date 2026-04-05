@@ -3,9 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/preferences_service.dart';
+import '../services/navigation_service.dart';
 import '../widgets/logo_painter.dart';
 import 'register_screen.dart';
-import 'role_selection_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,10 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final userCredential = await _authService.signInWithGoogle();
       if (userCredential != null && mounted) {
         await PreferencesService.setLoggedIn(true);
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
-        );
+        await NavigationService.navigateBasedOnRole(context);
       }
     } catch (e) {
       if (mounted) {
@@ -71,10 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (mounted) {
         await PreferencesService.setLoggedIn(true);
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
-        );
+        await NavigationService.navigateBasedOnRole(context);
       }
     } catch (e) {
       if (mounted) {
