@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -6,9 +7,17 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../services/technician_location_service.dart';
 import '../theme/app_colors.dart';
 
-/// Full-screen OSM map: user GPS + simulated nearby technicians (no Firebase).
+String _timeAgo(DateTime dt) {
+  final diff = DateTime.now().difference(dt);
+  if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  return '${diff.inHours}h ago';
+}
+
+/// Full-screen OSM map: user GPS + live Firebase technicians.
 class NearbyTechniciansMapScreen extends StatefulWidget {
   const NearbyTechniciansMapScreen({super.key});
 
@@ -24,14 +33,30 @@ class _NearbyTechniciansMapScreenState extends State<NearbyTechniciansMapScreen>
 
   LatLng? _userPoint;
   bool _loading = true;
-  _SimulatedTech? _selected;
+  TechnicianLocation? _selected;
 
-  late List<_SimulatedTech> _technicians;
+  final _technicianLocationService = TechnicianLocationService();
+  final _techNotifier = ValueNotifier<List<TechnicianLocation>>([]);
+  StreamSubscription<List<TechnicianLocation>>? _techSub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _initLocation());
+  }
+
+  @override
+  void dispose() {
+    _techSub?.cancel();
+    _techNotifier.dispose();
+    super.dispose();
+  }
+
+  void _subscribeToTechnicians(LatLng userPoint) {
+    _techSub?.cancel();
+    _techSub = _technicianLocationService
+        .nearbyStream(userPoint)
+        .listen((list) => _techNotifier.value = list);
   }
 
   Future<void> _initLocation() async {
@@ -68,7 +93,7 @@ class _NearbyTechniciansMapScreenState extends State<NearbyTechniciansMapScreen>
 
     if (!mounted) return;
 
-    _technicians = _buildSimulatedTechnicians(center);
+    _subscribeToTechnicians(center);
 
     setState(() {
       _userPoint = center;
@@ -89,55 +114,6 @@ class _NearbyTechniciansMapScreenState extends State<NearbyTechniciansMapScreen>
         ),
       );
     }
-  }
-
-  List<_SimulatedTech> _buildSimulatedTechnicians(LatLng user) {
-    return [
-      _SimulatedTech(
-        id: '1',
-        name: 'David L.',
-        specialty: 'Plumbing Specialist',
-        point: LatLng(user.latitude + 0.004, user.longitude + 0.003),
-        icon: Icons.plumbing_rounded,
-        rating: 4.9,
-        reviews: 128,
-        rateLabel: r'$85/hr',
-        distanceLabel: '1.2 mi',
-      ),
-      _SimulatedTech(
-        id: '2',
-        name: 'Marcus Chen',
-        specialty: 'Master Electrician',
-        point: LatLng(user.latitude - 0.003, user.longitude + 0.005),
-        icon: Icons.electric_bolt_rounded,
-        rating: 5.0,
-        reviews: 89,
-        rateLabel: r'$72/hr',
-        distanceLabel: '0.8 mi',
-      ),
-      _SimulatedTech(
-        id: '3',
-        name: 'Sarah K.',
-        specialty: 'HVAC Expert',
-        point: LatLng(user.latitude + 0.002, user.longitude - 0.004),
-        icon: Icons.construction_rounded,
-        rating: 4.8,
-        reviews: 56,
-        rateLabel: r'$68/hr',
-        distanceLabel: '1.5 mi',
-      ),
-      _SimulatedTech(
-        id: '4',
-        name: 'James R.',
-        specialty: 'Smart Home',
-        point: LatLng(user.latitude - 0.005, user.longitude - 0.002),
-        icon: Icons.home_repair_service_rounded,
-        rating: 4.7,
-        reviews: 34,
-        rateLabel: r'$90/hr',
-        distanceLabel: '2.1 mi',
-      ),
-    ];
   }
 
   @override
@@ -190,32 +166,33 @@ class _NearbyTechniciansMapScreenState extends State<NearbyTechniciansMapScreen>
                   subdomains: const ['a', 'b', 'c', 'd'],
                   userAgentPackageName: 'com.example.domfix',
                 ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _userPoint!,
-                      width: 56,
-                      height: 56,
-                      alignment: Alignment.center,
-                      child: _UserLocationMarker(),
-                    ),
-                    ..._technicians.map(
-                      (t) => Marker(
-                        point: t.point,
-                        width: 48,
-                        height: 48,
-                        alignment: Alignment.center,
-                        child: GestureDetector(
-                          onTap: () =>
-                              setState(() => _selected = t),
-                          child: _TechPin(
-                            icon: t.icon,
-                            emphasized: _selected?.id == t.id,
+                ValueListenableBuilder<List<TechnicianLocation>>(
+                  valueListenable: _techNotifier,
+                  builder: (_, techs, __) => MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: _userPoint!,
+                        width: 96,
+                        height: 96,
+                        alignment: Alignment.bottomCenter,
+                        child: const _UserLocationMarker(),
+                      ),
+                      ...techs.map(
+                        (t) => Marker(
+                          point: t.point,
+                          width: 52,
+                          height: 52,
+                          alignment: Alignment.center,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selected = t),
+                            child: _TechPin(
+                              emphasized: _selected?.id == t.id,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 RichAttributionWidget(
                   attributions: [
@@ -243,6 +220,8 @@ class _NearbyTechniciansMapScreenState extends State<NearbyTechniciansMapScreen>
                     child: Text(
                       'Nearby technicians',
                       textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.spaceGrotesk(
                         color: AppColors.onSurface,
                         fontSize: 16,
@@ -321,9 +300,17 @@ class _NearbyTechniciansMapScreenState extends State<NearbyTechniciansMapScreen>
               left: 12,
               right: 12,
               bottom: MediaQuery.paddingOf(context).bottom + 16,
-              child: _TechnicianPreviewCard(
-                tech: _selected!,
-                onClose: () => setState(() => _selected = null),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.52,
+                ),
+                child: SingleChildScrollView(
+                  child: _TechnicianPreviewCard(
+                    tech: _selected!,
+                    userPoint: _userPoint!,
+                    onClose: () => setState(() => _selected = null),
+                  ),
+                ),
               ),
             ),
         ],
@@ -332,121 +319,115 @@ class _NearbyTechniciansMapScreenState extends State<NearbyTechniciansMapScreen>
   }
 }
 
-class _SimulatedTech {
-  const _SimulatedTech({
-    required this.id,
-    required this.name,
-    required this.specialty,
-    required this.point,
-    required this.icon,
-    required this.rating,
-    required this.reviews,
-    required this.rateLabel,
-    required this.distanceLabel,
-  });
-
-  final String id;
-  final String name;
-  final String specialty;
-  final LatLng point;
-  final IconData icon;
-  final double rating;
-  final int reviews;
-  final String rateLabel;
-  final String distanceLabel;
-}
 
 class _UserLocationMarker extends StatelessWidget {
+  const _UserLocationMarker();
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFF262A30).withValues(alpha: 0.95),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppColors.neonAccent.withValues(alpha: 0.35),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.neonAccent.withValues(alpha: 0.2),
-                blurRadius: 12,
+    return SizedBox(
+      width: 96,
+      height: 96,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFF262A30).withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.neonAccent.withValues(alpha: 0.35),
               ),
-            ],
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.neonAccent.withValues(alpha: 0.2),
+                  blurRadius: 12,
+                ),
+              ],
+            ),
+            child: Text(
+              'YOU',
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              style: GoogleFonts.spaceGrotesk(
+                color: AppColors.neonAccent,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.4,
+              ),
+            ),
           ),
-          child: Text(
-            'YOU',
-            style: GoogleFonts.spaceGrotesk(
+          const SizedBox(height: 4),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
               color: AppColors.neonAccent,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.4,
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.neonAccent,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.neonAccent.withValues(alpha: 0.45),
-                blurRadius: 16,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.neonAccent.withValues(alpha: 0.45),
+                  blurRadius: 16,
+                ),
+              ],
+              border: Border.all(
+                color: AppColors.background,
+                width: 3,
               ),
-            ],
-            border: Border.all(
-              color: AppColors.background,
-              width: 3,
+            ),
+            child: Icon(
+              Icons.person_rounded,
+              color: const Color(0xFF181E00),
+              size: 24,
             ),
           ),
-          child: Icon(
-            Icons.person_rounded,
-            color: const Color(0xFF181E00),
-            size: 26,
-          ),
+        ],
         ),
-      ],
+      ),
     );
   }
 }
 
 class _TechPin extends StatelessWidget {
-  const _TechPin({required this.icon, required this.emphasized});
+  const _TechPin({required this.emphasized});
 
-  final IconData icon;
   final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedScale(
-      scale: emphasized ? 1.08 : 1,
-      duration: const Duration(milliseconds: 200),
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.surfaceContainerHighest,
-          border: Border.all(
-            color: AppColors.neonAccent.withValues(alpha: emphasized ? 0.8 : 0.4),
-            width: 2,
+    return SizedBox(
+      width: 52,
+      height: 52,
+      child: Center(
+        child: AnimatedScale(
+          scale: emphasized ? 1.06 : 1,
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.surfaceContainerHighest,
+              border: Border.all(
+                color: AppColors.neonAccent
+                    .withValues(alpha: emphasized ? 0.8 : 0.4),
+                width: 2,
+              ),
+              boxShadow: emphasized
+                  ? [
+                      BoxShadow(
+                        color: AppColors.neonAccent.withValues(alpha: 0.25),
+                        blurRadius: 12,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Icon(Icons.engineering_rounded, color: AppColors.neonAccent, size: 20),
           ),
-          boxShadow: emphasized
-              ? [
-                  BoxShadow(
-                    color: AppColors.neonAccent.withValues(alpha: 0.25),
-                    blurRadius: 12,
-                  ),
-                ]
-              : null,
         ),
-        child: Icon(icon, color: AppColors.neonAccent, size: 20),
       ),
     );
   }
@@ -455,10 +436,12 @@ class _TechPin extends StatelessWidget {
 class _TechnicianPreviewCard extends StatelessWidget {
   const _TechnicianPreviewCard({
     required this.tech,
+    required this.userPoint,
     required this.onClose,
   });
 
-  final _SimulatedTech tech;
+  final TechnicianLocation tech;
+  final LatLng userPoint;
   final VoidCallback onClose;
 
   @override
@@ -497,7 +480,7 @@ class _TechnicianPreviewCard extends StatelessWidget {
                       color: AppColors.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Icon(tech.icon,
+                    child: Icon(Icons.engineering_rounded,
                         color: AppColors.neonAccent, size: 28),
                   ),
                   const SizedBox(width: 14),
@@ -506,7 +489,7 @@ class _TechnicianPreviewCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          tech.name,
+                          'Technician ${tech.id.substring(0, 6)}',
                           style: GoogleFonts.spaceGrotesk(
                             color: Colors.white,
                             fontSize: 17,
@@ -515,36 +498,13 @@ class _TechnicianPreviewCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          tech.specialty.toUpperCase(),
+                          'ONLINE',
                           style: GoogleFonts.inter(
                             color: AppColors.neonAccent,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.2,
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(Icons.star_rounded,
-                                color: AppColors.neonAccent, size: 16),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${tech.rating}',
-                              style: GoogleFonts.inter(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '(${tech.reviews} reviews)',
-                              style: GoogleFonts.inter(
-                                color: AppColors.onSurfaceVariant,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
@@ -561,7 +521,7 @@ class _TechnicianPreviewCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        tech.distanceLabel.toUpperCase(),
+                        '${TechnicianLocationService.distanceKmPublic(userPoint, tech.point).toStringAsFixed(1)} km',
                         style: GoogleFonts.spaceGrotesk(
                           color: AppColors.neonAccent,
                           fontWeight: FontWeight.w800,
@@ -573,69 +533,26 @@ class _TechnicianPreviewCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF262A30).withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'RATE',
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              color: AppColors.onSurfaceVariant,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                          Text(
-                            tech.rateLabel,
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF262A30).withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time_rounded,
+                        color: AppColors.onSurfaceVariant, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Last seen: ${_timeAgo(tech.updatedAt)}',
+                      style: GoogleFonts.inter(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 12,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF262A30).withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'AVAILABILITY',
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              color: AppColors.onSurfaceVariant,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                          Text(
-                            'Available now',
-                            style: GoogleFonts.inter(
-                              color: AppColors.neonAccent,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               Row(

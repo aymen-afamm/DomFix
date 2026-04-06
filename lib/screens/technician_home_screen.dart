@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/technician_location_service.dart';
 import '../theme/app_colors.dart';
 import 'settings_screen.dart';
 
@@ -125,8 +126,27 @@ class _TechnicianHomeScreenState extends State<TechnicianHomeScreen> {
   }
 }
 
-class TechnicianDashboard extends StatelessWidget {
+class TechnicianDashboard extends StatefulWidget {
   const TechnicianDashboard({super.key});
+
+  @override
+  State<TechnicianDashboard> createState() => _TechnicianDashboardState();
+}
+
+class _TechnicianDashboardState extends State<TechnicianDashboard> {
+  final _locationService = TechnicianLocationService();
+
+  @override
+  void initState() {
+    super.initState();
+    _locationService.startPublishing();
+  }
+
+  @override
+  void dispose() {
+    _locationService.stopPublishing();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
