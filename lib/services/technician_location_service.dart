@@ -43,30 +43,45 @@ class TechnicianLocationService {
 
   /// Start publishing technician location every 5 seconds
   Future<void> startPublishing() async {
+    print('\n🚀 START PUBLISHING CALLED');
+    
     if (_isPublishing) {
+      print('⚠️  Already publishing - skipping');
       debugPrint('[TechnicianLocationService] Already publishing');
       return;
     }
 
     _isPublishing = true;
+    print('✅ Publishing flag set to true');
+    print('⏱️  Will update location every ${_publishInterval.inSeconds} seconds');
     debugPrint('[TechnicianLocationService] Starting location publishing');
     
     // Publish immediately
+    print('📍 Publishing location immediately...');
     await _publishOnce();
     
     // Then publish every 5 seconds
+    print('⏱️  Setting up periodic timer...');
     _publishTimer?.cancel();
-    _publishTimer = Timer.periodic(_publishInterval, (_) => _publishOnce());
+    _publishTimer = Timer.periodic(_publishInterval, (timer) {
+      print('\n⏰ Timer tick #${timer.tick} - Publishing location...');
+      _publishOnce();
+    });
+    print('✅ Periodic timer started successfully\n');
   }
 
   /// Stop publishing location updates
   /// Does NOT set any "online" field - we rely solely on updatedAt timestamp
   void stopPublishing() {
+    print('\n🛑 STOP PUBLISHING CALLED');
+    
     if (!_isPublishing) {
+      print('⚠️  Not currently publishing - skipping');
       debugPrint('[TechnicianLocationService] Not currently publishing');
       return;
     }
 
+    print('🛑 Stopping location publishing...');
     debugPrint('[TechnicianLocationService] Stopping location publishing');
     _isPublishing = false;
     
@@ -74,45 +89,81 @@ class TechnicianLocationService {
     _publishTimer?.cancel();
     _publishTimer = null;
     
+    print('✅ Timer cancelled');
+    print('✅ Publishing flag set to false');
+    print('ℹ️  Technician will appear offline when updatedAt becomes old (>10s)');
+    
     // NO "online" field update - technician is considered offline when updatedAt is old
     debugPrint('[TechnicianLocationService] Location publishing stopped');
+    print('========================================\n');
   }
 
   /// Publish current location once
   /// ONLY updates: lat, lng, updatedAt (NO "online" field)
   Future<void> _publishOnce() async {
+    print('\n========================================');
+    print('UPDATING LOCATION...');
+    print('========================================');
+    
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
+      print('❌ ERROR: No authenticated user');
       debugPrint('[TechnicianLocationService] No authenticated user');
       return;
     }
+    
+    print('✅ User authenticated: $uid');
 
     try {
       // Check location permission
+      print('📍 Checking location permission...');
       final permission = await Geolocator.checkPermission();
+      print('📍 Permission status: $permission');
+      
       if (permission == LocationPermission.denied || 
           permission == LocationPermission.deniedForever) {
+        print('❌ ERROR: Location permission denied');
         debugPrint('[TechnicianLocationService] Location permission denied');
         return;
       }
+      
+      print('✅ Location permission granted');
 
       // Get current position
+      print('📍 Getting current position...');
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 10),
         ),
       );
+      
+      print('✅ Position obtained:');
+      print('   Latitude: ${pos.latitude}');
+      print('   Longitude: ${pos.longitude}');
+      print('   Accuracy: ${pos.accuracy}m');
+      print('   Timestamp: ${DateTime.now()}');
 
       // Update Firestore - ONLY lat, lng, updatedAt (NO "online" field)
+      print('🔥 Updating Firestore...');
       await _firestore.collection(_collection).doc(uid).set({
         'lat': pos.latitude,
         'lng': pos.longitude,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      
+      print('✅ Firestore updated successfully!');
+      print('   Collection: $_collection');
+      print('   Document ID: $uid');
+      print('   Data: {lat: ${pos.latitude}, lng: ${pos.longitude}, updatedAt: serverTimestamp}');
+      print('========================================\n');
 
       debugPrint('[TechnicianLocationService] Location published: (${pos.latitude}, ${pos.longitude})');
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('❌ ERROR publishing location:');
+      print('   Error: $e');
+      print('   Stack trace: $stackTrace');
+      print('========================================\n');
       debugPrint('[TechnicianLocationService] Error publishing location: $e');
     }
   }

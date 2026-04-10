@@ -143,18 +143,35 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> with WidgetsB
   @override
   void initState() {
     super.initState();
+    print('\n🟢 ========================================');
+    print('🟢 TECHNICIAN DASHBOARD INITIALIZED');
+    print('🟢 ========================================');
+    
     // Add lifecycle observer
     WidgetsBinding.instance.addObserver(this);
+    print('✅ Lifecycle observer added');
+    
     // Start publishing location
+    print('📍 Starting location publishing...');
     _locationService.startPublishing();
+    print('🟢 ========================================\n');
   }
 
   @override
   void dispose() {
+    print('\n🔴 ========================================');
+    print('🔴 TECHNICIAN DASHBOARD DISPOSING');
+    print('🔴 ========================================');
+    
     // CRITICAL: Stop publishing when widget is disposed
+    print('🛑 Stopping location publishing...');
     _locationService.stopPublishing();
+    
     // Remove lifecycle observer
     WidgetsBinding.instance.removeObserver(this);
+    print('✅ Lifecycle observer removed');
+    print('🔴 ========================================\n');
+    
     super.dispose();
   }
 
@@ -162,10 +179,16 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> with WidgetsB
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     
+    print('\n🔄 ========================================');
+    print('🔄 APP LIFECYCLE STATE CHANGED');
+    print('🔄 New state: $state');
+    print('🔄 ========================================');
+    
     // Handle app lifecycle changes
     switch (state) {
       case AppLifecycleState.resumed:
         // App is in foreground - start publishing
+        print('✅ App resumed - starting location publishing');
         _locationService.startPublishing();
         break;
       case AppLifecycleState.paused:
@@ -173,9 +196,11 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> with WidgetsB
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
         // App is in background or closing - stop publishing
+        print('⚠️  App paused/inactive - stopping location publishing');
         _locationService.stopPublishing();
         break;
     }
+    print('🔄 ========================================\n');
   }
 
   @override
