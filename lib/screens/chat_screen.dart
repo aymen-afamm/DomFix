@@ -100,7 +100,7 @@ class _ChatScreenState extends State<ChatScreen> {
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
-            0, // Scroll to top (since reverse: true)
+            _scrollController.position.maxScrollExtent,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
           );
@@ -294,7 +294,7 @@ class _ChatScreenState extends State<ChatScreen> {
         
         return ListView.builder(
           controller: _scrollController,
-          reverse: true, // Show newest messages at bottom
+          reverse: false, // Normal order since messages are ASC
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           itemCount: messages.length,
           itemBuilder: (context, index) {

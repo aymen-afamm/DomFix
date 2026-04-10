@@ -134,14 +134,14 @@ class ChatService {
   }
 
   /// Get real-time stream of messages for a chat
-  /// Returns messages ordered by createdAt in descending order (newest first)
+  /// Returns messages ordered by createdAt in ascending order (oldest first)
   /// Use with StreamBuilder for real-time updates
   Stream<List<MessageModel>> getMessagesStream(String chatId) {
     return _firestore
         .collection('chats')
         .doc(chatId)
         .collection('messages')
-        .orderBy('createdAt', descending: true)
+        .orderBy('createdAt', descending: false)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) {

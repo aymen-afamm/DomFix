@@ -146,108 +146,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
     );
   }
 
-  /// Active Now / Stories Section
+  /// Active Now / Stories Section (removed fake users)
   Widget _buildActiveNowSection() {
-    return Container(
-      height: 100,
-      margin: const EdgeInsets.only(bottom: 16),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: [
-          _buildActiveNowItem(
-            isAddNew: true,
-            label: 'New',
-          ),
-          _buildActiveNowItem(
-            imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDO57bE2lO3AaLLaJTvCsZs36gz4xR_Awmikxn_QtI5YdKw7i-RRk0zce8scKt5_dFov8OxfgIVPRPteVFlqtJ_5G_lstcnrA45Hsr_XY_GzLLabC34tV1ZmFUKEYpGecASCGvY-ywbGDB1Y52NCnDEZ8r_u13hkPw_n1d3vKxI73c-tR3ptJuRvrcKY_9o93Yy38ySnQJ7fIREyvvfMbL_zlIWPRUJtvgJaHg9CATSgBqT1yaN9lxyV5MbGPznxN0N1b1Jt_g8wTc',
-            label: 'Marcus',
-            isActive: true,
-          ),
-          _buildActiveNowItem(
-            imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA98prX-DBAM6NyAZpIjfDwB8-kd9TUZmN6J8-xoANhtxxN57-f3gv-uhWoJ5LFkLBuBlZEqVFymmBJlKLBkIj2zKj6Gc3Keza0EGTwibD20AJDP-6wftkpv1HmEPNeIH4haWpfB4rI04WhhGDtuE_aMJS-q38sMSFnTmyy0nXLTul5-vOvZ6hICqlBCRTNl9_k2cQyBk0Brf5lM77uyf446XPifTpPNtUOehBmIKZ7ekBEUDA5jjl2g2qkvIuakdR1bBfBL_14AgE',
-            label: 'Sarah',
-            isActive: true,
-          ),
-          _buildActiveNowItem(
-            imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAQrg8xZXLrjhN2lGvA-WTCIn5aeBXAaCTyEYKU8xUHsjtpq9vv2kASqwWuIHkzPxJsQD6vdeb1Q_TFAnVbd-DGACbmgxHddIN-ywBb7YY0XZHRJ9AUY0sqMFpUxxi18AxiWEWKkcyiQbzLFk1Q5NMimr_-edTf5zh8y7qKzVuzUolj1Lhd9W-isj9fDixZqs4372zmOvgZO6qUqtnwGbZw82lh_JnbemI3pa9G3ewqJf6pwKs6K1r03Pw1VXXOGCwF5gUhq4WpEg0',
-            label: 'David',
-            isActive: false,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActiveNowItem({
-    String? imageUrl,
-    required String label,
-    bool isActive = false,
-    bool isAddNew = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 20),
-      child: Column(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isAddNew
-                    ? AppColors.outlineVariant
-                    : (isActive ? AppColors.primaryContainer : Colors.transparent),
-                width: 2,
-                style: isAddNew ? BorderStyle.solid : BorderStyle.solid,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(2),
-              child: isAddNew
-                  ? Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.surfaceContainerHigh,
-                      ),
-                      child: Icon(
-                        Icons.add,
-                        color: AppColors.primaryContainer,
-                        size: 24,
-                      ),
-                    )
-                  : ClipOval(
-                      child: Image.network(
-                        imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: AppColors.surfaceContainerHigh,
-                            child: Icon(
-                              Icons.person,
-                              color: AppColors.onSurfaceVariant,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: isAddNew || !isActive
-                  ? AppColors.onSurfaceVariant
-                  : AppColors.onSurface,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
+    return const SizedBox.shrink(); // Remove fake users section
   }
 
   /// Chat List with real-time Firestore data
@@ -424,7 +325,7 @@ class _ChatListItem extends StatelessWidget {
 
         final userData = userSnapshot.data!.data() as Map<String, dynamic>;
         final name = userData['name'] ?? userData['email'] ?? 'Unknown';
-        final photoUrl = userData['photoUrl'];
+        final photoUrl = userData['profileImage'] ?? userData['photoUrl'];
 
         // Check if unread (simple logic: can be enhanced)
         final isUnread = _isUnread(chatData);
