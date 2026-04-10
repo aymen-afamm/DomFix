@@ -38,11 +38,36 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    // Generate consistent chat ID for these two users
-    _chatId = _chatService.generateChatId(
-      _chatService.currentUserId,
-      widget.otherUserId,
-    );
+    
+    // CRITICAL: Generate consistent chat ID using static method
+    final currentUserId = _chatService.currentUserId;
+    final otherUserId = widget.otherUserId;
+    
+    if (currentUserId.isEmpty) {
+      debugPrint('[ChatScreen] ERROR: Current user not authenticated');
+      return;
+    }
+    
+    if (otherUserId.isEmpty) {
+      debugPrint('[ChatScreen] ERROR: Other user ID is empty');
+      return;
+    }
+    
+    // CRITICAL: Use static method to ensure consistency
+    _chatId = ChatService.generateChatId(currentUserId, otherUserId);
+    
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('[ChatScreen] 💬 CHAT INITIALIZED');
+    debugPrint('[ChatScreen] Current User: $currentUserId');
+    debugPrint('[ChatScreen] Other User: $otherUserId');
+    debugPrint('[ChatScreen] Generated Chat ID: $_chatId');
+    debugPrint('[ChatScreen] Listening to: chats/$_chatId/messages');
+    debugPrint('═══════════════════════════════════════');
+    
+    // Add listener to update UI when text changes
+    _messageController.addListener(() {
+      setState(() {}); // Rebuild to update send button state
+    });
   }
 
   @override
@@ -54,11 +79,28 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// Send text message to Firestore
   Future<void> _sendMessage() async {
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('[ChatScreen] 🚀 SEND BUTTON CLICKED');
+    debugPrint('═══════════════════════════════════════');
+    
     // Validate input
-    if (_messageController.text.trim().isEmpty) return;
-    if (_isSending) return;
+    if (_messageController.text.trim().isEmpty) {
+      debugPrint('[ChatScreen] ❌ Message is empty, not sending');
+      return;
+    }
+    
+    if (_isSending) {
+      debugPrint('[ChatScreen] ⏳ Already sending, skipping');
+      return;
+    }
 
     final messageText = _messageController.text.trim();
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    
+    debugPrint('[ChatScreen] 📝 Message text: "$messageText"');
+    debugPrint('[ChatScreen] 👤 Current user: $currentUserId');
+    debugPrint('[ChatScreen] 👥 Receiver: ${widget.otherUserId}');
+    debugPrint('[ChatScreen] 💬 Chat ID: $_chatId');
     
     // Clear input immediately for better UX
     _messageController.clear();
@@ -66,22 +108,32 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _isSending = true);
 
     try {
-      // Send message to Firestore
+      debugPrint('[ChatScreen] 📤 Calling ChatService.sendMessage()...');
+      
+      // CRITICAL: sendMessage now generates chatId internally
       await _chatService.sendMessage(
-        chatId: _chatId,
         receiverId: widget.otherUserId,
         text: messageText,
       );
 
+      debugPrint('[ChatScreen] ✅ Message sent successfully!');
+      debugPrint('═══════════════════════════════════════');
+      
       // Auto-scroll to bottom after sending
       _scrollToBottom();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('[ChatScreen] ❌ ERROR SENDING MESSAGE');
+      debugPrint('[ChatScreen] Error: $e');
+      debugPrint('[ChatScreen] StackTrace: $stackTrace');
+      debugPrint('═══════════════════════════════════════');
+      
       // Show error to user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to send message: ${e.toString()}'),
+            content: Text('Failed to send: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
