@@ -9,12 +9,25 @@ import 'package:latlong2/latlong.dart';
 
 import '../services/technician_location_service.dart';
 import '../theme/app_colors.dart';
+import 'chat_screen.dart';
 
 String _timeAgo(DateTime dt) {
   final diff = DateTime.now().difference(dt);
   if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
   if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
   return '${diff.inHours}h ago';
+}
+
+/// Check if technician is online based on last update time
+/// Online = updated within last 10 seconds
+bool _isOnline(DateTime updatedAt) {
+  final secondsSinceUpdate = DateTime.now().difference(updatedAt).inSeconds;
+  return secondsSinceUpdate <= 10;
+}
+
+/// Get online status text
+String _getOnlineStatus(DateTime updatedAt) {
+  return _isOnline(updatedAt) ? 'ONLINE' : 'OFFLINE';
 }
 
 /// Full-screen OSM map: user GPS + live Firebase technicians.
@@ -498,9 +511,11 @@ class _TechnicianPreviewCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'ONLINE',
+                          _getOnlineStatus(tech.updatedAt),
                           style: GoogleFonts.inter(
-                            color: AppColors.neonAccent,
+                            color: _isOnline(tech.updatedAt) 
+                                ? AppColors.neonAccent 
+                                : Colors.grey,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.2,
@@ -584,7 +599,29 @@ class _TechnicianPreviewCard extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: FilledButton.icon(
-                      onPressed: () {},
+                      onPressed: () {
+                        // Navigate to chat screen
+                        try {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                otherUserId: tech.id,
+                                otherUserName: 'Technician ${tech.id.substring(0, 6)}',
+                                otherUserRole: 'technician',
+                              ),
+                            ),
+                          );
+                        } catch (e) {
+                          // Show error if navigation fails
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to open chat: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
                       icon: Icon(Icons.chat_rounded,
                           size: 18, color: const Color(0xFF181E00)),
                       label: Text(

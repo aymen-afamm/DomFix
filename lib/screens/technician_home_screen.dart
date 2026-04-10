@@ -12,7 +12,7 @@ class TechnicianHomeScreen extends StatefulWidget {
   State<TechnicianHomeScreen> createState() => _TechnicianHomeScreenState();
 }
 
-class _TechnicianHomeScreenState extends State<TechnicianHomeScreen> {
+class _TechnicianHomeScreenState extends State<TechnicianHomeScreen> with WidgetsBindingObserver {
   late PageController _pageController;
   int _currentIndex = 0;
 
@@ -27,11 +27,15 @@ class _TechnicianHomeScreenState extends State<TechnicianHomeScreen> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    // Add lifecycle observer to handle app state changes
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -133,19 +137,45 @@ class TechnicianDashboard extends StatefulWidget {
   State<TechnicianDashboard> createState() => _TechnicianDashboardState();
 }
 
-class _TechnicianDashboardState extends State<TechnicianDashboard> {
+class _TechnicianDashboardState extends State<TechnicianDashboard> with WidgetsBindingObserver {
   final _locationService = TechnicianLocationService();
 
   @override
   void initState() {
     super.initState();
+    // Add lifecycle observer
+    WidgetsBinding.instance.addObserver(this);
+    // Start publishing location
     _locationService.startPublishing();
   }
 
   @override
   void dispose() {
+    // CRITICAL: Stop publishing when widget is disposed
     _locationService.stopPublishing();
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // Handle app lifecycle changes
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // App is in foreground - start publishing
+        _locationService.startPublishing();
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        // App is in background or closing - stop publishing
+        _locationService.stopPublishing();
+        break;
+    }
   }
 
   @override

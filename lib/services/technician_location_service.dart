@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -36,55 +37,130 @@ class TechnicianLocationService {
   final _auth = FirebaseAuth.instance;
 
   Timer? _publishTimer;
+  bool _isPublishing = false;
 
   // ── Technician side ──────────────────────────────────────────────────────
 
+  /// Start publishing technician location every 5 seconds
   Future<void> startPublishing() async {
+    if (_isPublishing) {
+      debugPrint('[TechnicianLocationService] Already publishing');
+      return;
+    }
+
+    _isPublishing = true;
+    debugPrint('[TechnicianLocationService] Starting location publishing');
+    
+    // Publish immediately
     await _publishOnce();
+    
+    // Then publish every 5 seconds
+    _publishTimer?.cancel();
     _publishTimer = Timer.periodic(_publishInterval, (_) => _publishOnce());
   }
 
+  /// Stop publishing location updates
+  /// Does NOT set any "online" field - we rely solely on updatedAt timestamp
   void stopPublishing() {
+    if (!_isPublishing) {
+      debugPrint('[TechnicianLocationService] Not currently publishing');
+      return;
+    }
+
+    debugPrint('[TechnicianLocationService] Stopping location publishing');
+    _isPublishing = false;
+    
+    // Cancel timer
     _publishTimer?.cancel();
     _publishTimer = null;
-    final uid = _auth.currentUser?.uid;
-    if (uid != null) {
-      _firestore
-          .collection(_collection)
-          .doc(uid)
-          .update({'online': false}).ignore();
-    }
+    
+    // NO "online" field update - technician is considered offline when updatedAt is old
+    debugPrint('[TechnicianLocationService] Location publishing stopped');
   }
 
+  /// Publish current location once
+  /// ONLY updates: lat, lng, updatedAt (NO "online" field)
   Future<void> _publishOnce() async {
     final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
+    if (uid == null) {
+      debugPrint('[TechnicianLocationService] No authenticated user');
+      return;
+    }
+
     try {
+      // Check location permission
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied || 
+          permission == LocationPermission.deniedForever) {
+        debugPrint('[TechnicianLocationService] Location permission denied');
+        return;
+      }
+
+      // Get current position
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings:
-            const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
       );
+
+      // Update Firestore - ONLY lat, lng, updatedAt (NO "online" field)
       await _firestore.collection(_collection).doc(uid).set({
         'lat': pos.latitude,
         'lng': pos.longitude,
-        'online': true,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-    } catch (_) {}
+
+      debugPrint('[TechnicianLocationService] Location published: (${pos.latitude}, ${pos.longitude})');
+    } catch (e) {
+      debugPrint('[TechnicianLocationService] Error publishing location: $e');
+    }
   }
 
   // ── User side ────────────────────────────────────────────────────────────
 
-  /// Emits only online technicians within [_radiusKm] of [userPoint].
+  /// Emits only RECENTLY ACTIVE technicians within [_radiusKm] of [userPoint]
+  /// A technician is considered online if their last update was within 10 seconds
+  /// This eliminates "ghost" technicians who closed their app
   Stream<List<TechnicianLocation>> nearbyStream(LatLng userPoint) {
     return _firestore
         .collection(_collection)
-        .where('online', isEqualTo: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map(TechnicianLocation.fromDoc)
-            .where((t) => _distanceKm(userPoint, t.point) <= _radiusKm)
-            .toList());
+        .map((snap) {
+      final now = DateTime.now();
+      return snap.docs
+          .map((doc) {
+            try {
+              return TechnicianLocation.fromDoc(doc);
+            } catch (e) {
+              debugPrint('[TechnicianLocationService] Error parsing doc ${doc.id}: $e');
+              return null;
+            }
+          })
+          .whereType<TechnicianLocation>() // Filter out nulls
+          .where((t) {
+            // Filter 1: Check if last update was within 10 seconds (online check)
+            final secondsSinceUpdate = now.difference(t.updatedAt).inSeconds;
+            final isOnline = secondsSinceUpdate <= 10;
+            
+            if (!isOnline) {
+              debugPrint('[TechnicianLocationService] Technician ${t.id} is offline (${secondsSinceUpdate}s ago)');
+              return false;
+            }
+            
+            // Filter 2: Check if within radius
+            final distance = _distanceKm(userPoint, t.point);
+            final isNearby = distance <= _radiusKm;
+            
+            if (!isNearby) {
+              debugPrint('[TechnicianLocationService] Technician ${t.id} is too far (${distance.toStringAsFixed(1)} km)');
+              return false;
+            }
+            
+            return true;
+          })
+          .toList();
+    });
   }
 
   static double distanceKmPublic(LatLng a, LatLng b) => _distanceKm(a, b);

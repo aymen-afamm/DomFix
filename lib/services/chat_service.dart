@@ -22,7 +22,7 @@ class ChatService {
   }
 
   /// Send a text message
-  /// Creates chat document if it doesn't exist
+  /// CRITICAL: Creates chat document BEFORE sending message to avoid permission errors
   /// Updates lastMessage and lastMessageTime in chat document
   Future<void> sendMessage({
     required String chatId,
@@ -38,6 +38,23 @@ class ChatService {
       if (currentUserId.isEmpty) {
         throw Exception('User not authenticated');
       }
+
+      // Debug logs
+      debugPrint('[ChatService] Sending message');
+      debugPrint('[ChatService] Current User ID: $currentUserId');
+      debugPrint('[ChatService] Receiver ID: $receiverId');
+      debugPrint('[ChatService] Chat ID: $chatId');
+      debugPrint('[ChatService] Participants: [$currentUserId, $receiverId]');
+
+      // CRITICAL: Create/update chat document FIRST to ensure participants array exists
+      // This prevents permission-denied errors when adding messages
+      await _firestore.collection('chats').doc(chatId).set({
+        'participants': [currentUserId, receiverId],
+        'lastMessage': text.trim(),
+        'lastMessageTime': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      debugPrint('[ChatService] Chat document created/updated with participants');
 
       // Create message document
       final messageData = {
@@ -55,13 +72,6 @@ class ChatService {
           .collection('messages')
           .add(messageData);
 
-      // Update or create chat document
-      await _firestore.collection('chats').doc(chatId).set({
-        'participants': [currentUserId, receiverId],
-        'lastMessage': text.trim(),
-        'lastMessageTime': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
       debugPrint('[ChatService] Message sent successfully');
     } catch (e) {
       debugPrint('[ChatService] Error sending message: $e');
@@ -70,7 +80,7 @@ class ChatService {
   }
 
   /// Send an audio message
-  /// Similar to sendMessage but for audio type
+  /// CRITICAL: Creates chat document BEFORE sending message to avoid permission errors
   Future<void> sendAudioMessage({
     required String chatId,
     required String receiverId,
@@ -84,6 +94,21 @@ class ChatService {
       if (currentUserId.isEmpty) {
         throw Exception('User not authenticated');
       }
+
+      // Debug logs
+      debugPrint('[ChatService] Sending audio message');
+      debugPrint('[ChatService] Current User ID: $currentUserId');
+      debugPrint('[ChatService] Receiver ID: $receiverId');
+      debugPrint('[ChatService] Chat ID: $chatId');
+
+      // CRITICAL: Create/update chat document FIRST
+      await _firestore.collection('chats').doc(chatId).set({
+        'participants': [currentUserId, receiverId],
+        'lastMessage': '🎤 Audio message',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      debugPrint('[ChatService] Chat document created/updated');
 
       // Create audio message document
       final messageData = {
@@ -100,13 +125,6 @@ class ChatService {
           .doc(chatId)
           .collection('messages')
           .add(messageData);
-
-      // Update chat document
-      await _firestore.collection('chats').doc(chatId).set({
-        'participants': [currentUserId, receiverId],
-        'lastMessage': '🎤 Audio message',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
 
       debugPrint('[ChatService] Audio message sent successfully');
     } catch (e) {
