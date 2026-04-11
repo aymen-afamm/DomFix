@@ -1,9 +1,17 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import '../theme/app_colors.dart';
 import '../services/chat_service.dart';
+import '../services/firebase_storage_service.dart';
 import '../models/message_model.dart';
+import '../widgets/audio_recorder_widget.dart';
+import '../widgets/audio_player_widget.dart';
+import '../widgets/image_message_widget.dart';
+import '../widgets/file_message_widget.dart';
 
 /// Chat screen for one-on-one communication between client and technician
 /// Integrates with Firebase Firestore for real-time messaging
@@ -30,11 +38,16 @@ class _ChatScreenState extends State<ChatScreen> {
   
   // Services
   final ChatService _chatService = ChatService();
+  final FirebaseStorageService _storageService = FirebaseStorageService();
+  final ImagePicker _imagePicker = ImagePicker();
   
   // State
   late String _chatId;
   late Stream<List<MessageModel>> _messagesStream;
   bool _isSending = false;
+  bool _isRecording = false;
+  bool _isUploading = false;
+  double _uploadProgress = 0.0;
 
   @override
   void initState() {
@@ -490,74 +503,92 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  /// Message content based on type (text or audio)
+  /// Message content based on type (text, audio, image, file)
   Widget _buildMessageContent(MessageModel message) {
-    if (message.type == 'text' && message.text != null) {
-      // Text message
-      return Text(
-        message.text!,
-        style: GoogleFonts.inter(
-          fontSize: 14,
-          height: 1.5,
-          color: AppColors.onSurface,
-        ),
-      );
-    } else if (message.type == 'audio' && message.audioUrl != null) {
-      // Audio message placeholder
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.primaryContainer.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.play_arrow,
-              color: AppColors.primaryContainer,
-              size: 20,
-            ),
+    switch (message.type) {
+      case 'text':
+        return Text(
+          message.text ?? '',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            height: 1.5,
+            color: AppColors.onSurface,
           ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Audio Message',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.onSurface,
-                ),
-              ),
-              Text(
-                '0:00',
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
-                ),
-              ),
-            ],
+        );
+      
+      case 'audio':
+        return AudioPlayerWidget(
+          audioUrl: message.audioUrl ?? message.fileUrl ?? '',
+          duration: message.duration,
+          isCurrentUser: message.isFromUser(_chatService.currentUserId),
+        );
+      
+      case 'image':
+        return ImageMessageWidget(
+          imageUrl: message.fileUrl ?? '',
+          isCurrentUser: message.isFromUser(_chatService.currentUserId),
+        );
+      
+      case 'file':
+        return FileMessageWidget(
+          fileUrl: message.fileUrl ?? '',
+          fileName: message.fileName ?? 'Unknown file',
+          isCurrentUser: message.isFromUser(_chatService.currentUserId),
+        );
+      
+      default:
+        return Text(
+          'Unsupported message type',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontStyle: FontStyle.italic,
+            color: AppColors.onSurfaceVariant.withValues(alpha: 0.5),
           ),
-        ],
-      );
-    } else {
-      // Fallback for unknown message type
-      return Text(
-        'Unsupported message type',
-        style: GoogleFonts.inter(
-          fontSize: 12,
-          fontStyle: FontStyle.italic,
-          color: AppColors.onSurfaceVariant.withValues(alpha: 0.5),
-        ),
-      );
+        );
     }
   }
 
   /// Input section with text field and send button
   Widget _buildInputSection() {
+    // Show audio recorder when recording
+    if (_isRecording) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: AudioRecorderWidget(
+          onAudioRecorded: _handleAudioRecorded,
+          onCancel: () => setState(() => _isRecording = false),
+        ),
+      );
+    }
+
+    // Show upload progress
+    if (_isUploading) {
+      return Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          children: [
+            CircularProgressIndicator(
+              value: _uploadProgress,
+              color: AppColors.primaryContainer,
+            ),
+            const SizedBox(width: 16),
+            Text(
+              'Uploading... ${(_uploadProgress * 100).toInt()}%',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: AppColors.onSurface,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -577,16 +608,9 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Row(
         children: [
-          // Attachment button (optional)
+          // Attachment button
           GestureDetector(
-            onTap: () {
-              // TODO: Implement attachment functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Attachment feature coming soon'),
-                ),
-              );
-            },
+            onTap: _showMediaOptions,
             child: Container(
               width: 40,
               height: 40,
@@ -625,18 +649,20 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          // Send button
+          // Mic or Send button
           GestureDetector(
-            onTap: _isSending ? null : _sendMessage,
+            onTap: _messageController.text.trim().isEmpty
+                ? () => setState(() => _isRecording = true)
+                : (_isSending ? null : _sendMessage),
             child: Container(
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: _messageController.text.trim().isEmpty || _isSending
+                color: _isSending
                     ? AppColors.surfaceContainerHighest.withValues(alpha: 0.5)
                     : AppColors.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: _messageController.text.trim().isEmpty || _isSending
+                boxShadow: _isSending
                     ? []
                     : [
                         BoxShadow(
@@ -658,10 +684,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     )
                   : Icon(
-                      Icons.send_rounded,
-                      color: _messageController.text.trim().isEmpty
-                          ? AppColors.onSurfaceVariant.withValues(alpha: 0.3)
-                          : AppColors.background,
+                      _messageController.text.trim().isEmpty
+                          ? Icons.mic
+                          : Icons.send_rounded,
+                      color: AppColors.background,
                       size: 20,
                     ),
             ),
@@ -669,5 +695,273 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  /// Show media options bottom sheet
+  void _showMediaOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildMediaOption(
+              icon: Icons.photo_library,
+              label: 'Photo',
+              color: Colors.purple,
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage();
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildMediaOption(
+              icon: Icons.camera_alt,
+              label: 'Camera',
+              color: Colors.blue,
+              onTap: () {
+                Navigator.pop(context);
+                _takePhoto();
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildMediaOption(
+              icon: Icons.insert_drive_file,
+              label: 'File',
+              color: Colors.orange,
+              onTap: () {
+                Navigator.pop(context);
+                _pickFile();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMediaOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Handle audio recording completion
+  Future<void> _handleAudioRecorded(File audioFile, int duration) async {
+    setState(() {
+      _isRecording = false;
+      _isUploading = true;
+      _uploadProgress = 0.0;
+    });
+
+    try {
+      // Upload audio to Firebase Storage
+      final audioUrl = await _storageService.uploadAudio(
+        chatId: _chatId,
+        audioFile: audioFile,
+      );
+
+      // Send audio message
+      await _chatService.sendAudioMessage(
+        receiverId: widget.otherUserId,
+        audioUrl: audioUrl,
+        duration: duration,
+      );
+
+      _scrollToBottom();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send audio: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
+    }
+  }
+
+  /// Pick image from gallery
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+      );
+
+      if (image != null) {
+        await _sendImageMessage(File(image.path), image.name);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick image: $e')),
+        );
+      }
+    }
+  }
+
+  /// Take photo with camera
+  Future<void> _takePhoto() async {
+    try {
+      final XFile? photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 70,
+      );
+
+      if (photo != null) {
+        await _sendImageMessage(File(photo.path), photo.name);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to take photo: $e')),
+        );
+      }
+    }
+  }
+
+  /// Pick file
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'zip'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final fileName = result.files.single.name;
+        await _sendFileMessage(file, fileName);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick file: $e')),
+        );
+      }
+    }
+  }
+
+  /// Send image message
+  Future<void> _sendImageMessage(File imageFile, String fileName) async {
+    setState(() {
+      _isUploading = true;
+      _uploadProgress = 0.0;
+    });
+
+    try {
+      // Upload image to Firebase Storage
+      final imageUrl = await _storageService.uploadImage(
+        chatId: _chatId,
+        imageFile: imageFile,
+        compress: true,
+      );
+
+      // Send image message
+      await _chatService.sendImageMessage(
+        receiverId: widget.otherUserId,
+        imageUrl: imageUrl,
+        fileName: fileName,
+      );
+
+      _scrollToBottom();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
+    }
+  }
+
+  /// Send file message
+  Future<void> _sendFileMessage(File file, String fileName) async {
+    setState(() {
+      _isUploading = true;
+      _uploadProgress = 0.0;
+    });
+
+    try {
+      // Upload file to Firebase Storage
+      final fileUrl = await _storageService.uploadFile(
+        chatId: _chatId,
+        file: file,
+        fileName: fileName,
+      );
+
+      // Send file message
+      await _chatService.sendFileMessage(
+        receiverId: widget.otherUserId,
+        fileUrl: fileUrl,
+        fileName: fileName,
+      );
+
+      _scrollToBottom();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
+    }
   }
 }

@@ -1,16 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Message model for chat messages
-/// Supports text and audio message types
+/// Supports text, audio, image, and file message types
 /// Includes WhatsApp-like read/unread functionality
 class MessageModel {
   final String id;
   final String senderId;
-  final String type; // "text" or "audio"
+  final String type; // "text", "audio", "image", "file"
   final String? text;
   final String? audioUrl;
+  final String? fileUrl; // For images and files
+  final String? fileName; // Original file name
+  final int? duration; // Audio duration in seconds
   final DateTime createdAt;
-  final bool isSeen; // ✅ NEW: WhatsApp-like seen status
+  final bool isSeen;
 
   MessageModel({
     required this.id,
@@ -18,8 +21,11 @@ class MessageModel {
     required this.type,
     this.text,
     this.audioUrl,
+    this.fileUrl,
+    this.fileName,
+    this.duration,
     required this.createdAt,
-    this.isSeen = false, // Default to false (unread)
+    this.isSeen = false,
   });
 
   /// Create MessageModel from Firestore document
@@ -32,8 +38,11 @@ class MessageModel {
       type: data['type'] ?? 'text',
       text: data['text'],
       audioUrl: data['audioUrl'],
+      fileUrl: data['fileUrl'],
+      fileName: data['fileName'],
+      duration: data['duration'] as int?,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      isSeen: data['isSeen'] ?? false, // ✅ NEW: Read seen status from Firestore
+      isSeen: data['isSeen'] ?? false,
     );
   }
 
@@ -44,8 +53,11 @@ class MessageModel {
       'type': type,
       'text': text,
       'audioUrl': audioUrl,
+      'fileUrl': fileUrl,
+      'fileName': fileName,
+      'duration': duration,
       'createdAt': FieldValue.serverTimestamp(),
-      'isSeen': isSeen, // ✅ NEW: Include seen status
+      'isSeen': isSeen,
     };
   }
 
@@ -60,5 +72,20 @@ class MessageModel {
     final minute = createdAt.minute.toString().padLeft(2, '0');
     final period = createdAt.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';
+  }
+
+  /// Get formatted duration for audio messages
+  String getFormattedDuration() {
+    if (duration == null) return '0:00';
+    final minutes = duration! ~/ 60;
+    final seconds = duration! % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  /// Get file extension from fileName
+  String? getFileExtension() {
+    if (fileName == null) return null;
+    final parts = fileName!.split('.');
+    return parts.length > 1 ? parts.last.toUpperCase() : null;
   }
 }
