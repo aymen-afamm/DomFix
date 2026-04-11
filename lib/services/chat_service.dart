@@ -127,174 +127,81 @@ class ChatService {
     }
   }
 
-  /// Send an audio message
-  /// CRITICAL: Uses static generateChatId to ensure consistency
-  /// ✅ NEW: Implements WhatsApp-like unread count system
-  Future<void> sendAudioMessage({
+  /// Send media message (audio, image, video, file)
+  /// Uses Cloudinary URL
+  Future<void> sendMediaMessage({
     required String receiverId,
-    required String audioUrl,
-    int? duration,
+    required String type, // 'audio', 'image', 'video', 'file'
+    required String mediaUrl, // Cloudinary URL
+    String? fileName,
+    int? duration, // For audio/video
   }) async {
     try {
-      if (audioUrl.trim().isEmpty) {
-        throw Exception('Audio URL cannot be empty');
+      if (mediaUrl.trim().isEmpty) {
+        throw Exception('Media URL cannot be empty');
       }
 
       if (currentUserId.isEmpty) {
         throw Exception('User not authenticated');
       }
 
-      // CRITICAL: Use static method to generate consistent chatId
       final chatId = ChatService.generateChatId(currentUserId, receiverId);
 
-      // Debug logs
-      debugPrint('[ChatService] Sending audio message');
+      debugPrint('[ChatService] Sending $type message');
       debugPrint('[ChatService] Chat ID: $chatId');
-      debugPrint('[ChatService] Duration: ${duration}s');
+      debugPrint('[ChatService] Media URL: $mediaUrl');
 
-      // ✅ Use batch write for atomic operations
+      // Determine last message preview
+      String lastMessagePreview;
+      switch (type) {
+        case 'audio':
+          lastMessagePreview = '🎤 Audio message';
+          break;
+        case 'image':
+          lastMessagePreview = '📷 Photo';
+          break;
+        case 'video':
+          lastMessagePreview = '🎥 Video';
+          break;
+        case 'file':
+          lastMessagePreview = '📎 ${fileName ?? "File"}';
+          break;
+        default:
+          lastMessagePreview = 'Media';
+      }
+
       final batch = _firestore.batch();
       final chatRef = _firestore.collection('chats').doc(chatId);
       
-      // Update chat document with unread counts
+      // Update chat document
       batch.set(chatRef, {
         'participants': [currentUserId, receiverId],
-        'lastMessage': '🎤 Audio message',
+        'lastMessage': lastMessagePreview,
         'lastMessageTime': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
-        // ✅ NEW: Increment unread count for receiver
         'unreadCount_$receiverId': FieldValue.increment(1),
-        // ✅ NEW: Reset unread count for sender
         'unreadCount_$currentUserId': 0,
       }, SetOptions(merge: true));
 
-      debugPrint('[ChatService] Chat document created/updated');
-
-      // Create audio message document
+      // Create message document
       final messageRef = chatRef.collection('messages').doc();
       final messageData = {
         'senderId': currentUserId,
-        'type': 'audio',
+        'type': type,
         'text': null,
-        'audioUrl': audioUrl.trim(),
+        'mediaUrl': mediaUrl.trim(),
+        'fileName': fileName,
         'duration': duration,
         'createdAt': FieldValue.serverTimestamp(),
-        'isSeen': false, // ✅ NEW: Default to unseen
-      };
-
-      batch.set(messageRef, messageData);
-      await batch.commit();
-
-      debugPrint('[ChatService] Audio message sent successfully');
-    } catch (e) {
-      debugPrint('[ChatService] Error sending audio message: $e');
-      rethrow;
-    }
-  }
-
-  /// Send an image message
-  Future<void> sendImageMessage({
-    required String receiverId,
-    required String imageUrl,
-    String? fileName,
-  }) async {
-    try {
-      if (imageUrl.trim().isEmpty) {
-        throw Exception('Image URL cannot be empty');
-      }
-
-      if (currentUserId.isEmpty) {
-        throw Exception('User not authenticated');
-      }
-
-      final chatId = ChatService.generateChatId(currentUserId, receiverId);
-
-      debugPrint('[ChatService] Sending image message');
-      debugPrint('[ChatService] Chat ID: $chatId');
-
-      final batch = _firestore.batch();
-      final chatRef = _firestore.collection('chats').doc(chatId);
-      
-      batch.set(chatRef, {
-        'participants': [currentUserId, receiverId],
-        'lastMessage': '📷 Photo',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'unreadCount_$receiverId': FieldValue.increment(1),
-        'unreadCount_$currentUserId': 0,
-      }, SetOptions(merge: true));
-
-      final messageRef = chatRef.collection('messages').doc();
-      final messageData = {
-        'senderId': currentUserId,
-        'type': 'image',
-        'text': null,
-        'fileUrl': imageUrl.trim(),
-        'fileName': fileName,
-        'createdAt': FieldValue.serverTimestamp(),
         'isSeen': false,
       };
 
       batch.set(messageRef, messageData);
       await batch.commit();
 
-      debugPrint('[ChatService] Image message sent successfully');
+      debugPrint('[ChatService] $type message sent successfully');
     } catch (e) {
-      debugPrint('[ChatService] Error sending image message: $e');
-      rethrow;
-    }
-  }
-
-  /// Send a file message
-  Future<void> sendFileMessage({
-    required String receiverId,
-    required String fileUrl,
-    required String fileName,
-  }) async {
-    try {
-      if (fileUrl.trim().isEmpty) {
-        throw Exception('File URL cannot be empty');
-      }
-
-      if (currentUserId.isEmpty) {
-        throw Exception('User not authenticated');
-      }
-
-      final chatId = ChatService.generateChatId(currentUserId, receiverId);
-
-      debugPrint('[ChatService] Sending file message');
-      debugPrint('[ChatService] Chat ID: $chatId');
-      debugPrint('[ChatService] File name: $fileName');
-
-      final batch = _firestore.batch();
-      final chatRef = _firestore.collection('chats').doc(chatId);
-      
-      batch.set(chatRef, {
-        'participants': [currentUserId, receiverId],
-        'lastMessage': '📎 $fileName',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'unreadCount_$receiverId': FieldValue.increment(1),
-        'unreadCount_$currentUserId': 0,
-      }, SetOptions(merge: true));
-
-      final messageRef = chatRef.collection('messages').doc();
-      final messageData = {
-        'senderId': currentUserId,
-        'type': 'file',
-        'text': null,
-        'fileUrl': fileUrl.trim(),
-        'fileName': fileName,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isSeen': false,
-      };
-
-      batch.set(messageRef, messageData);
-      await batch.commit();
-
-      debugPrint('[ChatService] File message sent successfully');
-    } catch (e) {
-      debugPrint('[ChatService] Error sending file message: $e');
+      debugPrint('[ChatService] Error sending $type message: $e');
       rethrow;
     }
   }

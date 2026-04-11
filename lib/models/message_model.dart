@@ -1,17 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Message model for chat messages
-/// Supports text, audio, image, and file message types
-/// Includes WhatsApp-like read/unread functionality
+/// Supports text, audio, image, video, and file message types
+/// Uses Cloudinary for media storage
 class MessageModel {
   final String id;
   final String senderId;
-  final String type; // "text", "audio", "image", "file"
+  final String type; // "text", "audio", "image", "video", "file"
   final String? text;
-  final String? audioUrl;
-  final String? fileUrl; // For images and files
+  final String? mediaUrl; // Cloudinary URL for all media types
   final String? fileName; // Original file name
-  final int? duration; // Audio duration in seconds
+  final int? duration; // Audio/video duration in seconds
   final DateTime createdAt;
   final bool isSeen;
 
@@ -20,8 +19,7 @@ class MessageModel {
     required this.senderId,
     required this.type,
     this.text,
-    this.audioUrl,
-    this.fileUrl,
+    this.mediaUrl,
     this.fileName,
     this.duration,
     required this.createdAt,
@@ -37,8 +35,7 @@ class MessageModel {
       senderId: data['senderId'] ?? '',
       type: data['type'] ?? 'text',
       text: data['text'],
-      audioUrl: data['audioUrl'],
-      fileUrl: data['fileUrl'],
+      mediaUrl: data['mediaUrl'],
       fileName: data['fileName'],
       duration: data['duration'] as int?,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -52,8 +49,7 @@ class MessageModel {
       'senderId': senderId,
       'type': type,
       'text': text,
-      'audioUrl': audioUrl,
-      'fileUrl': fileUrl,
+      'mediaUrl': mediaUrl,
       'fileName': fileName,
       'duration': duration,
       'createdAt': FieldValue.serverTimestamp(),
@@ -74,7 +70,7 @@ class MessageModel {
     return '$hour:$minute $period';
   }
 
-  /// Get formatted duration for audio messages
+  /// Get formatted duration for audio/video messages
   String getFormattedDuration() {
     if (duration == null) return '0:00';
     final minutes = duration! ~/ 60;
@@ -88,4 +84,7 @@ class MessageModel {
     final parts = fileName!.split('.');
     return parts.length > 1 ? parts.last.toUpperCase() : null;
   }
+
+  /// Check if message has media
+  bool get hasMedia => mediaUrl != null && mediaUrl!.isNotEmpty;
 }
