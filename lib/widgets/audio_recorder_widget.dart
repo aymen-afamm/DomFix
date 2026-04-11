@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:record/record.dart';
+import 'package:flutter_sound/flutter_sound.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_colors.dart';
 
 class AudioRecorderWidget extends StatefulWidget {
@@ -20,7 +21,7 @@ class AudioRecorderWidget extends StatefulWidget {
 }
 
 class _AudioRecorderWidgetState extends State<AudioRecorderWidget> {
-  final AudioRecorder _recorder = AudioRecorder();
+  FlutterSoundRecorder? _recorder;
   bool _isRecording = false;
   int _recordDuration = 0;
   String? _audioPath;
@@ -28,47 +29,63 @@ class _AudioRecorderWidgetState extends State<AudioRecorderWidget> {
   @override
   void initState() {
     super.initState();
-    _startRecording();
+    _initRecorder();
   }
 
   @override
   void dispose() {
-    _recorder.dispose();
+    _recorder?.closeRecorder();
     super.dispose();
+  }
+
+  Future<void> _initRecorder() async {
+    _recorder = FlutterSoundRecorder();
+    await _recorder!.openRecorder();
+    
+    final status = await Permission.microphone.request();
+    if (status == PermissionStatus.granted) {
+      _startRecording();
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission denied')),
+        );
+        widget.onCancel();
+      }
+    }
   }
 
   Future<void> _startRecording() async {
     try {
-      if (await _recorder.hasPermission()) {
-        final dir = await getTemporaryDirectory();
-        _audioPath = '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.aac';
-        
-        await _recorder.start(
-          const RecordConfig(encoder: AudioEncoder.aacLc),
-          path: _audioPath!,
-        );
-        
-        setState(() => _isRecording = true);
-        
-        // Update duration every second
-        while (_isRecording) {
-          await Future.delayed(const Duration(seconds: 1));
-          if (_isRecording) {
-            setState(() => _recordDuration++);
-          }
+      final dir = await getTemporaryDirectory();
+      _audioPath = '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.aac';
+      
+      await _recorder!.startRecorder(
+        toFile: _audioPath,
+        codec: Codec.aacADTS,
+      );
+      
+      setState(() => _isRecording = true);
+      
+      // Update duration every second
+      while (_isRecording && mounted) {
+        await Future.delayed(const Duration(seconds: 1));
+        if (_isRecording && mounted) {
+          setState(() => _recordDuration++);
         }
       }
     } catch (e) {
       debugPrint('[AudioRecorder] Error: $e');
+      if (mounted) widget.onCancel();
     }
   }
 
   Future<void> _stopRecording() async {
     try {
-      await _recorder.stop();
+      await _recorder!.stopRecorder();
       setState(() => _isRecording = false);
       
-      if (_audioPath != null) {
+      if (_audioPath != null && mounted) {
         widget.onAudioRecorded(File(_audioPath!), _recordDuration);
       }
     } catch (e) {
@@ -77,9 +94,14 @@ class _AudioRecorderWidgetState extends State<AudioRecorderWidget> {
   }
 
   void _cancelRecording() async {
-    await _recorder.stop();
-    setState(() => _isRecording = false);
-    widget.onCancel();
+    try {
+      await _recorder!.stopRecorder();
+      setState(() => _isRecording = false);
+      widget.onCancel();
+    } catch (e) {
+      debugPrint('[AudioRecorder] Error canceling: $e');
+      widget.onCancel();
+    }
   }
 
   String _formatDuration(int seconds) {

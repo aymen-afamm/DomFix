@@ -788,6 +788,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// Handle audio recording completion
   Future<void> _handleAudioRecorded(File audioFile, int duration) async {
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('[ChatScreen] 🎤 AUDIO MESSAGE FLOW STARTED');
+    debugPrint('[ChatScreen] Audio file: ${audioFile.path}');
+    debugPrint('[ChatScreen] Duration: $duration seconds');
+    debugPrint('[ChatScreen] Chat ID: $_chatId');
+    
     setState(() {
       _isRecording = false;
       _isUploading = true;
@@ -795,26 +801,54 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
+      // Verify file exists before upload
+      if (!await audioFile.exists()) {
+        throw Exception('Audio file does not exist: ${audioFile.path}');
+      }
+      
+      final fileSize = await audioFile.length();
+      debugPrint('[ChatScreen] Audio file size: $fileSize bytes');
+      
+      if (fileSize == 0) {
+        throw Exception('Audio file is empty (0 bytes)');
+      }
+      
+      debugPrint('[ChatScreen] 📤 Starting upload to Firebase Storage...');
+      
       // Upload audio to Firebase Storage
       final audioUrl = await _storageService.uploadAudio(
         chatId: _chatId,
         audioFile: audioFile,
       );
+      
+      debugPrint('[ChatScreen] ✅ Upload successful!');
+      debugPrint('[ChatScreen] Audio URL: $audioUrl');
+      debugPrint('[ChatScreen] 📬 Sending message to Firestore...');
 
-      // Send audio message
+      // Send audio message to Firestore
       await _chatService.sendAudioMessage(
         receiverId: widget.otherUserId,
         audioUrl: audioUrl,
         duration: duration,
       );
+      
+      debugPrint('[ChatScreen] ✅ Audio message sent successfully!');
+      debugPrint('═══════════════════════════════════════');
 
       _scrollToBottom();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[ChatScreen] ❌ AUDIO MESSAGE FAILED');
+      debugPrint('[ChatScreen] Error: $e');
+      debugPrint('[ChatScreen] StackTrace: $stackTrace');
+      debugPrint('═══════════════════════════════════════');
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to send audio: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -889,18 +923,38 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// Send image message
   Future<void> _sendImageMessage(File imageFile, String fileName) async {
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('[ChatScreen] 📷 IMAGE MESSAGE FLOW STARTED');
+    debugPrint('[ChatScreen] Image file: ${imageFile.path}');
+    debugPrint('[ChatScreen] File name: $fileName');
+    debugPrint('[ChatScreen] Chat ID: $_chatId');
+    
     setState(() {
       _isUploading = true;
       _uploadProgress = 0.0;
     });
 
     try {
+      // Verify file exists
+      if (!await imageFile.exists()) {
+        throw Exception('Image file does not exist: ${imageFile.path}');
+      }
+      
+      final fileSize = await imageFile.length();
+      debugPrint('[ChatScreen] Image file size: $fileSize bytes');
+      
+      debugPrint('[ChatScreen] 📤 Starting upload to Firebase Storage...');
+      
       // Upload image to Firebase Storage
       final imageUrl = await _storageService.uploadImage(
         chatId: _chatId,
         imageFile: imageFile,
         compress: true,
       );
+      
+      debugPrint('[ChatScreen] ✅ Upload successful!');
+      debugPrint('[ChatScreen] Image URL: $imageUrl');
+      debugPrint('[ChatScreen] 📬 Sending message to Firestore...');
 
       // Send image message
       await _chatService.sendImageMessage(
@@ -908,14 +962,24 @@ class _ChatScreenState extends State<ChatScreen> {
         imageUrl: imageUrl,
         fileName: fileName,
       );
+      
+      debugPrint('[ChatScreen] ✅ Image message sent successfully!');
+      debugPrint('═══════════════════════════════════════');
 
       _scrollToBottom();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[ChatScreen] ❌ IMAGE MESSAGE FAILED');
+      debugPrint('[ChatScreen] Error: $e');
+      debugPrint('[ChatScreen] StackTrace: $stackTrace');
+      debugPrint('═══════════════════════════════════════');
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to send image: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -928,18 +992,38 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// Send file message
   Future<void> _sendFileMessage(File file, String fileName) async {
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('[ChatScreen] 📎 FILE MESSAGE FLOW STARTED');
+    debugPrint('[ChatScreen] File path: ${file.path}');
+    debugPrint('[ChatScreen] File name: $fileName');
+    debugPrint('[ChatScreen] Chat ID: $_chatId');
+    
     setState(() {
       _isUploading = true;
       _uploadProgress = 0.0;
     });
 
     try {
+      // Verify file exists
+      if (!await file.exists()) {
+        throw Exception('File does not exist: ${file.path}');
+      }
+      
+      final fileSize = await file.length();
+      debugPrint('[ChatScreen] File size: $fileSize bytes');
+      
+      debugPrint('[ChatScreen] 📤 Starting upload to Firebase Storage...');
+      
       // Upload file to Firebase Storage
       final fileUrl = await _storageService.uploadFile(
         chatId: _chatId,
         file: file,
         fileName: fileName,
       );
+      
+      debugPrint('[ChatScreen] ✅ Upload successful!');
+      debugPrint('[ChatScreen] File URL: $fileUrl');
+      debugPrint('[ChatScreen] 📬 Sending message to Firestore...');
 
       // Send file message
       await _chatService.sendFileMessage(
@@ -947,14 +1031,24 @@ class _ChatScreenState extends State<ChatScreen> {
         fileUrl: fileUrl,
         fileName: fileName,
       );
+      
+      debugPrint('[ChatScreen] ✅ File message sent successfully!');
+      debugPrint('═══════════════════════════════════════');
 
       _scrollToBottom();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[ChatScreen] ❌ FILE MESSAGE FAILED');
+      debugPrint('[ChatScreen] Error: $e');
+      debugPrint('[ChatScreen] StackTrace: $stackTrace');
+      debugPrint('═══════════════════════════════════════');
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to send file: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }

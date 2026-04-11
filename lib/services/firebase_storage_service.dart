@@ -15,19 +15,47 @@ class FirebaseStorageService {
     required File audioFile,
   }) async {
     try {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[UPLOAD] 🎤 AUDIO UPLOAD STARTED');
+      debugPrint('[UPLOAD] Chat ID: $chatId');
+      debugPrint('[UPLOAD] File path: ${audioFile.path}');
+      
+      // Verify file exists
+      if (!await audioFile.exists()) {
+        debugPrint('[UPLOAD] ❌ ERROR: Audio file does not exist!');
+        throw Exception('Audio file does not exist at path: ${audioFile.path}');
+      }
+      
+      final fileSize = await audioFile.length();
+      debugPrint('[UPLOAD] File size: ${fileSize} bytes');
+      
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.aac';
-      final ref = _storage.ref().child('chats/$chatId/audio/$fileName');
+      final storagePath = 'chats/$chatId/audio/$fileName';
+      final ref = _storage.ref().child(storagePath);
       
-      debugPrint('[Storage] Uploading audio: $fileName');
+      debugPrint('[UPLOAD] Storage path: $storagePath');
+      debugPrint('[UPLOAD] Starting upload...');
       
-      final uploadTask = ref.putFile(audioFile);
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
+      // Upload file
+      final uploadTask = await ref.putFile(audioFile);
+      debugPrint('[UPLOAD] ✅ Upload completed');
+      debugPrint('[UPLOAD] State: ${uploadTask.state}');
       
-      debugPrint('[Storage] Audio uploaded: $downloadUrl');
+      // Get download URL
+      debugPrint('[UPLOAD] Getting download URL...');
+      final downloadUrl = await uploadTask.ref.getDownloadURL();
+      
+      debugPrint('[UPLOAD] ✅ SUCCESS!');
+      debugPrint('[UPLOAD] Download URL: $downloadUrl');
+      debugPrint('═══════════════════════════════════════');
+      
       return downloadUrl;
-    } catch (e) {
-      debugPrint('[Storage] Error uploading audio: $e');
+    } catch (e, stackTrace) {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[UPLOAD] ❌ AUDIO UPLOAD FAILED');
+      debugPrint('[UPLOAD] Error: $e');
+      debugPrint('[UPLOAD] StackTrace: $stackTrace');
+      debugPrint('═══════════════════════════════════════');
       rethrow;
     }
   }
@@ -40,31 +68,63 @@ class FirebaseStorageService {
     bool compress = true,
   }) async {
     try {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[UPLOAD] 📷 IMAGE UPLOAD STARTED');
+      debugPrint('[UPLOAD] Chat ID: $chatId');
+      debugPrint('[UPLOAD] File path: ${imageFile.path}');
+      
+      // Verify file exists
+      if (!await imageFile.exists()) {
+        debugPrint('[UPLOAD] ❌ ERROR: Image file does not exist!');
+        throw Exception('Image file does not exist at path: ${imageFile.path}');
+      }
+      
       File fileToUpload = imageFile;
       
       // Compress image before upload
       if (compress) {
-        debugPrint('[Storage] Compressing image...');
+        debugPrint('[UPLOAD] Compressing image...');
         final compressedFile = await _compressImage(imageFile);
         if (compressedFile != null) {
           fileToUpload = compressedFile;
-          debugPrint('[Storage] Image compressed');
+          final originalSize = await imageFile.length();
+          final compressedSize = await compressedFile.length();
+          debugPrint('[UPLOAD] Original size: $originalSize bytes');
+          debugPrint('[UPLOAD] Compressed size: $compressedSize bytes');
+          debugPrint('[UPLOAD] Saved: ${originalSize - compressedSize} bytes');
         }
       }
       
+      final fileSize = await fileToUpload.length();
+      debugPrint('[UPLOAD] File size: $fileSize bytes');
+      
       final fileName = '${DateTime.now().millisecondsSinceEpoch}${path.extension(imageFile.path)}';
-      final ref = _storage.ref().child('chats/$chatId/images/$fileName');
+      final storagePath = 'chats/$chatId/images/$fileName';
+      final ref = _storage.ref().child(storagePath);
       
-      debugPrint('[Storage] Uploading image: $fileName');
+      debugPrint('[UPLOAD] Storage path: $storagePath');
+      debugPrint('[UPLOAD] Starting upload...');
       
-      final uploadTask = ref.putFile(fileToUpload);
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
+      // Upload file
+      final uploadTask = await ref.putFile(fileToUpload);
+      debugPrint('[UPLOAD] ✅ Upload completed');
+      debugPrint('[UPLOAD] State: ${uploadTask.state}');
       
-      debugPrint('[Storage] Image uploaded: $downloadUrl');
+      // Get download URL
+      debugPrint('[UPLOAD] Getting download URL...');
+      final downloadUrl = await uploadTask.ref.getDownloadURL();
+      
+      debugPrint('[UPLOAD] ✅ SUCCESS!');
+      debugPrint('[UPLOAD] Download URL: $downloadUrl');
+      debugPrint('═══════════════════════════════════════');
+      
       return downloadUrl;
-    } catch (e) {
-      debugPrint('[Storage] Error uploading image: $e');
+    } catch (e, stackTrace) {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[UPLOAD] ❌ IMAGE UPLOAD FAILED');
+      debugPrint('[UPLOAD] Error: $e');
+      debugPrint('[UPLOAD] StackTrace: $stackTrace');
+      debugPrint('═══════════════════════════════════════');
       rethrow;
     }
   }
@@ -77,18 +137,47 @@ class FirebaseStorageService {
     required String fileName,
   }) async {
     try {
-      final ref = _storage.ref().child('chats/$chatId/files/$fileName');
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[UPLOAD] 📎 FILE UPLOAD STARTED');
+      debugPrint('[UPLOAD] Chat ID: $chatId');
+      debugPrint('[UPLOAD] File name: $fileName');
+      debugPrint('[UPLOAD] File path: ${file.path}');
       
-      debugPrint('[Storage] Uploading file: $fileName');
+      // Verify file exists
+      if (!await file.exists()) {
+        debugPrint('[UPLOAD] ❌ ERROR: File does not exist!');
+        throw Exception('File does not exist at path: ${file.path}');
+      }
       
-      final uploadTask = ref.putFile(file);
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
+      final fileSize = await file.length();
+      debugPrint('[UPLOAD] File size: $fileSize bytes');
       
-      debugPrint('[Storage] File uploaded: $downloadUrl');
+      final storagePath = 'chats/$chatId/files/$fileName';
+      final ref = _storage.ref().child(storagePath);
+      
+      debugPrint('[UPLOAD] Storage path: $storagePath');
+      debugPrint('[UPLOAD] Starting upload...');
+      
+      // Upload file
+      final uploadTask = await ref.putFile(file);
+      debugPrint('[UPLOAD] ✅ Upload completed');
+      debugPrint('[UPLOAD] State: ${uploadTask.state}');
+      
+      // Get download URL
+      debugPrint('[UPLOAD] Getting download URL...');
+      final downloadUrl = await uploadTask.ref.getDownloadURL();
+      
+      debugPrint('[UPLOAD] ✅ SUCCESS!');
+      debugPrint('[UPLOAD] Download URL: $downloadUrl');
+      debugPrint('═══════════════════════════════════════');
+      
       return downloadUrl;
-    } catch (e) {
-      debugPrint('[Storage] Error uploading file: $e');
+    } catch (e, stackTrace) {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[UPLOAD] ❌ FILE UPLOAD FAILED');
+      debugPrint('[UPLOAD] Error: $e');
+      debugPrint('[UPLOAD] StackTrace: $stackTrace');
+      debugPrint('═══════════════════════════════════════');
       rethrow;
     }
   }
