@@ -94,7 +94,12 @@ class _ExperiencePortfolioScreenState extends State<ExperiencePortfolioScreen>
 
       HapticFeedback.lightImpact();
       final file = File(picked.path);
-      final url = await CloudinaryService.uploadImage(file);
+      final cloudinaryService = CloudinaryService();
+      final url = await cloudinaryService.uploadImage(
+        imageFile: file,
+        chatId: 'certifications',
+        compress: false,
+      );
       final fileName = picked.name;
 
       if (!mounted) return;
@@ -105,13 +110,7 @@ class _ExperiencePortfolioScreenState extends State<ExperiencePortfolioScreen>
         );
       });
       HapticFeedback.mediumImpact();
-    } on CloudinaryException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _certUploading = false;
-        _certError = e.message;
-      });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _certUploading = false;
@@ -146,7 +145,12 @@ class _ExperiencePortfolioScreenState extends State<ExperiencePortfolioScreen>
 
       HapticFeedback.lightImpact();
       final file = File(picked.path);
-      final url = await CloudinaryService.uploadImage(file);
+      final cloudinaryService = CloudinaryService();
+      final url = await cloudinaryService.uploadImage(
+        imageFile: file,
+        chatId: 'portfolio',
+        compress: true,
+      );
       final fileName = picked.name;
 
       if (!mounted) return;
@@ -157,13 +161,7 @@ class _ExperiencePortfolioScreenState extends State<ExperiencePortfolioScreen>
         );
       });
       HapticFeedback.mediumImpact();
-    } on CloudinaryException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _portfolioUploading = false;
-        _portfolioError = e.message;
-      });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _portfolioUploading = false;

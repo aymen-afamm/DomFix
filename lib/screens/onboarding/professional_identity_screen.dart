@@ -136,7 +136,12 @@ class _ProfessionalIdentityScreenState
 
       HapticFeedback.lightImpact();
 
-      final url = await CloudinaryService.uploadImage(file);
+      final cloudinaryService = CloudinaryService();
+      final url = await cloudinaryService.uploadImage(
+        imageFile: file,
+        chatId: 'profile_photos', // Use a generic folder for profile photos
+        compress: true,
+      );
 
       if (!mounted) return;
       setState(() {
@@ -145,13 +150,7 @@ class _ProfessionalIdentityScreenState
       });
 
       HapticFeedback.mediumImpact();
-    } on CloudinaryException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _photoUploadState = _UploadState.error;
-        _photoErrorMessage = e.message;
-      });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _photoUploadState = _UploadState.error;

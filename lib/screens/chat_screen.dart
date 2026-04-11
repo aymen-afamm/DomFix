@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import '../theme/app_colors.dart';
 import '../services/chat_service.dart';
-import '../services/firebase_storage_service.dart';
+import '../services/cloudinary_service.dart';
 import '../models/message_model.dart';
 import '../widgets/audio_recorder_widget.dart';
 import '../widgets/audio_player_widget.dart';
@@ -38,7 +38,7 @@ class _ChatScreenState extends State<ChatScreen> {
   
   // Services
   final ChatService _chatService = ChatService();
-  final FirebaseStorageService _storageService = FirebaseStorageService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
   final ImagePicker _imagePicker = ImagePicker();
   
   // State
@@ -518,20 +518,20 @@ class _ChatScreenState extends State<ChatScreen> {
       
       case 'audio':
         return AudioPlayerWidget(
-          audioUrl: message.audioUrl ?? message.fileUrl ?? '',
+          audioUrl: message.mediaUrl ?? '',
           duration: message.duration,
           isCurrentUser: message.isFromUser(_chatService.currentUserId),
         );
       
       case 'image':
         return ImageMessageWidget(
-          imageUrl: message.fileUrl ?? '',
+          imageUrl: message.mediaUrl ?? '',
           isCurrentUser: message.isFromUser(_chatService.currentUserId),
         );
       
       case 'file':
         return FileMessageWidget(
-          fileUrl: message.fileUrl ?? '',
+          fileUrl: message.mediaUrl ?? '',
           fileName: message.fileName ?? 'Unknown file',
           isCurrentUser: message.isFromUser(_chatService.currentUserId),
         );
@@ -813,25 +813,27 @@ class _ChatScreenState extends State<ChatScreen> {
         throw Exception('Audio file is empty (0 bytes)');
       }
       
-      debugPrint('[ChatScreen] 📤 Starting upload to Firebase Storage...');
+      debugPrint('[ChatScreen] 📤 Starting upload to Cloudinary...');
       
-      // Upload audio to Firebase Storage
-      final audioUrl = await _storageService.uploadAudio(
+      // ✅ Upload audio to Cloudinary
+      final audioUrl = await _cloudinaryService.uploadAudio(
         chatId: _chatId,
         audioFile: audioFile,
       );
       
       debugPrint('[ChatScreen] ✅ Upload successful!');
-      debugPrint('[ChatScreen] Audio URL: $audioUrl');
+      debugPrint('MEDIA URL: $audioUrl');
       debugPrint('[ChatScreen] 📬 Sending message to Firestore...');
 
-      // Send audio message to Firestore
-      await _chatService.sendAudioMessage(
+      // ✅ Send audio message to Firestore with mediaUrl
+      await _chatService.sendMediaMessage(
         receiverId: widget.otherUserId,
-        audioUrl: audioUrl,
+        type: 'audio',
+        mediaUrl: audioUrl,
         duration: duration,
       );
       
+      debugPrint('[ChatService] ✅ Message saved successfully');
       debugPrint('[ChatScreen] ✅ Audio message sent successfully!');
       debugPrint('═══════════════════════════════════════');
 
@@ -943,26 +945,28 @@ class _ChatScreenState extends State<ChatScreen> {
       final fileSize = await imageFile.length();
       debugPrint('[ChatScreen] Image file size: $fileSize bytes');
       
-      debugPrint('[ChatScreen] 📤 Starting upload to Firebase Storage...');
+      debugPrint('[ChatScreen] 📤 Starting upload to Cloudinary...');
       
-      // Upload image to Firebase Storage
-      final imageUrl = await _storageService.uploadImage(
+      // ✅ Upload image to Cloudinary
+      final imageUrl = await _cloudinaryService.uploadImage(
         chatId: _chatId,
         imageFile: imageFile,
         compress: true,
       );
       
       debugPrint('[ChatScreen] ✅ Upload successful!');
-      debugPrint('[ChatScreen] Image URL: $imageUrl');
+      debugPrint('MEDIA URL: $imageUrl');
       debugPrint('[ChatScreen] 📬 Sending message to Firestore...');
 
-      // Send image message
-      await _chatService.sendImageMessage(
+      // ✅ Send image message with mediaUrl
+      await _chatService.sendMediaMessage(
         receiverId: widget.otherUserId,
-        imageUrl: imageUrl,
+        type: 'image',
+        mediaUrl: imageUrl,
         fileName: fileName,
       );
       
+      debugPrint('[ChatService] ✅ Message saved successfully');
       debugPrint('[ChatScreen] ✅ Image message sent successfully!');
       debugPrint('═══════════════════════════════════════');
 
@@ -1012,26 +1016,28 @@ class _ChatScreenState extends State<ChatScreen> {
       final fileSize = await file.length();
       debugPrint('[ChatScreen] File size: $fileSize bytes');
       
-      debugPrint('[ChatScreen] 📤 Starting upload to Firebase Storage...');
+      debugPrint('[ChatScreen] 📤 Starting upload to Cloudinary...');
       
-      // Upload file to Firebase Storage
-      final fileUrl = await _storageService.uploadFile(
+      // ✅ Upload file to Cloudinary
+      final fileUrl = await _cloudinaryService.uploadFile(
         chatId: _chatId,
         file: file,
         fileName: fileName,
       );
       
       debugPrint('[ChatScreen] ✅ Upload successful!');
-      debugPrint('[ChatScreen] File URL: $fileUrl');
+      debugPrint('MEDIA URL: $fileUrl');
       debugPrint('[ChatScreen] 📬 Sending message to Firestore...');
 
-      // Send file message
-      await _chatService.sendFileMessage(
+      // ✅ Send file message with mediaUrl
+      await _chatService.sendMediaMessage(
         receiverId: widget.otherUserId,
-        fileUrl: fileUrl,
+        type: 'file',
+        mediaUrl: fileUrl,
         fileName: fileName,
       );
       
+      debugPrint('[ChatService] ✅ Message saved successfully');
       debugPrint('[ChatScreen] ✅ File message sent successfully!');
       debugPrint('═══════════════════════════════════════');
 

@@ -3,17 +3,16 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:crypto/crypto.dart';
 
 /// Cloudinary service for uploading media files
 /// Handles images, audio, video, and files
+/// Uses SIGNED uploads (no preset required)
 class CloudinaryService {
-  // ⚠️ REPLACE THESE WITH YOUR CLOUDINARY CREDENTIALS
+  // ✅ CLOUDINARY CREDENTIALS - CONFIGURED
   static const String _cloudName = 'dmksbfd7h';
-  static const String _uploadPreset = 'chat_media_preset'; // Unsigned preset
-  
-  // Optional: For signed uploads (more secure)
-  static const String _apiKey = 'YOUR_API_KEY';
-  static const String _apiSecret = 'YOUR_API_SECRET';
+  static const String _apiKey = '862973714739146';
+  static const String _apiSecret = 'YOUR_API_SECRET'; // ⚠️ REPLACE WITH YOUR API SECRET
   
   // Upload endpoints
   static const String _imageUploadUrl = 'https://api.cloudinary.com/v1_1/$_cloudName/image/upload';
@@ -246,6 +245,7 @@ class CloudinaryService {
   }
 
   /// Core upload method to Cloudinary
+  /// Uses SIGNED uploads (no preset required)
   Future<String> _uploadToCloudinary({
     required File file,
     required String uploadUrl,
@@ -260,6 +260,25 @@ class CloudinaryService {
       debugPrint('[Cloudinary] Folder: $folder');
       debugPrint('[Cloudinary] Resource type: $resourceType');
       
+      // Generate timestamp
+      final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      
+      // Create parameters for signature
+      final params = {
+        'timestamp': timestamp.toString(),
+        'folder': folder,
+      };
+      
+      if (publicId != null) {
+        params['public_id'] = publicId;
+      }
+      
+      // Generate signature
+      final signature = _generateSignature(params, _apiSecret);
+      
+      debugPrint('[Cloudinary] Using SIGNED upload');
+      debugPrint('[Cloudinary] Timestamp: $timestamp');
+      
       // Create multipart request
       final request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
       
@@ -272,8 +291,10 @@ class CloudinaryService {
       );
       request.files.add(multipartFile);
       
-      // Add parameters
-      request.fields['upload_preset'] = _uploadPreset;
+      // Add signed parameters
+      request.fields['api_key'] = _apiKey;
+      request.fields['timestamp'] = timestamp.toString();
+      request.fields['signature'] = signature;
       request.fields['folder'] = folder;
       
       if (publicId != null) {
@@ -313,6 +334,26 @@ class CloudinaryService {
       debugPrint('[Cloudinary] Upload error: $e');
       rethrow;
     }
+  }
+  
+  /// Generate signature for signed uploads
+  String _generateSignature(Map<String, String> params, String apiSecret) {
+    // Sort parameters alphabetically
+    final sortedKeys = params.keys.toList()..sort();
+    
+    // Create string to sign
+    final stringToSign = sortedKeys
+        .map((key) => '$key=${params[key]}')
+        .join('&');
+    
+    // Add API secret
+    final fullString = stringToSign + apiSecret;
+    
+    // Generate SHA-1 hash
+    final bytes = utf8.encode(fullString);
+    final digest = sha1.convert(bytes);
+    
+    return digest.toString();
   }
 
   /// Compress image to reduce file size

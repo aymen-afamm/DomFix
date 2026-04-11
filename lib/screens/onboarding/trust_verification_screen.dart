@@ -97,7 +97,12 @@ class _TrustVerificationScreenState extends State<TrustVerificationScreen>
       });
       HapticFeedback.lightImpact();
 
-      final url = await CloudinaryService.uploadImage(File(picked.path));
+      final cloudinaryService = CloudinaryService();
+      final url = await cloudinaryService.uploadImage(
+        imageFile: File(picked.path),
+        chatId: 'identity_documents',
+        compress: false,
+      );
 
       if (!mounted) return;
       setState(() {
@@ -105,13 +110,7 @@ class _TrustVerificationScreenState extends State<TrustVerificationScreen>
         widget.onboardingData.identityDocumentUrl = url;
       });
       HapticFeedback.mediumImpact();
-    } on CloudinaryException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _idUploadState = _DocUploadState.error;
-        _idError = e.message;
-      });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _idUploadState = _DocUploadState.error;

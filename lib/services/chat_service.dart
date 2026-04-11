@@ -137,6 +137,11 @@ class ChatService {
     int? duration, // For audio/video
   }) async {
     try {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[ChatService] 📤 sendMediaMessage() CALLED');
+      debugPrint('[ChatService] Type: $type');
+      debugPrint('[ChatService] Media URL: $mediaUrl');
+      
       if (mediaUrl.trim().isEmpty) {
         throw Exception('Media URL cannot be empty');
       }
@@ -147,9 +152,9 @@ class ChatService {
 
       final chatId = ChatService.generateChatId(currentUserId, receiverId);
 
-      debugPrint('[ChatService] Sending $type message');
       debugPrint('[ChatService] Chat ID: $chatId');
-      debugPrint('[ChatService] Media URL: $mediaUrl');
+      debugPrint('[ChatService] Receiver: $receiverId');
+      debugPrint('[ChatService] Current User: $currentUserId');
 
       // Determine last message preview
       String lastMessagePreview;
@@ -170,6 +175,8 @@ class ChatService {
           lastMessagePreview = 'Media';
       }
 
+      debugPrint('[ChatService] 💾 Saving to Firestore...');
+      
       final batch = _firestore.batch();
       final chatRef = _firestore.collection('chats').doc(chatId);
       
@@ -183,25 +190,34 @@ class ChatService {
         'unreadCount_$currentUserId': 0,
       }, SetOptions(merge: true));
 
-      // Create message document
+      // Create message document with mediaUrl
       final messageRef = chatRef.collection('messages').doc();
       final messageData = {
         'senderId': currentUserId,
         'type': type,
         'text': null,
-        'mediaUrl': mediaUrl.trim(),
+        'mediaUrl': mediaUrl.trim(), // ✅ ONLY mediaUrl field
         'fileName': fileName,
         'duration': duration,
         'createdAt': FieldValue.serverTimestamp(),
         'isSeen': false,
       };
 
+      debugPrint('[ChatService] Message data: $messageData');
       batch.set(messageRef, messageData);
+      
       await batch.commit();
 
-      debugPrint('[ChatService] $type message sent successfully');
-    } catch (e) {
-      debugPrint('[ChatService] Error sending $type message: $e');
+      debugPrint('[ChatService] ✅ $type message sent successfully');
+      debugPrint('[ChatService] Message ID: ${messageRef.id}');
+      debugPrint('[ChatService] Full path: chats/$chatId/messages/${messageRef.id}');
+      debugPrint('═══════════════════════════════════════');
+    } catch (e, stackTrace) {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[ChatService] ❌ ERROR sending $type message');
+      debugPrint('[ChatService] Error: $e');
+      debugPrint('[ChatService] StackTrace: $stackTrace');
+      debugPrint('═══════════════════════════════════════');
       rethrow;
     }
   }
