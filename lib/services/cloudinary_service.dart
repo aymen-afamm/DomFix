@@ -9,10 +9,10 @@ import 'package:crypto/crypto.dart';
 /// Handles images, audio, video, and files
 /// Uses SIGNED uploads (no preset required)
 class CloudinaryService {
-  // ✅ CLOUDINARY CREDENTIALS - CONFIGURED
   static const String _cloudName = 'dmksbfd7h';
-  static const String _apiKey = '862973714739146';
-  static const String _apiSecret = 'YOUR_API_SECRET'; // ⚠️ REPLACE WITH YOUR API SECRET
+  static const String _apiKey = '834875583628169';
+  static const String _apiSecret = 'IlQroLgR-jmGzC4WC6l-Vgj9gQ0';
+  static const String _uploadPreset = 'chat_upload';
   
   // Upload endpoints
   static const String _imageUploadUrl = 'https://api.cloudinary.com/v1_1/$_cloudName/image/upload';
