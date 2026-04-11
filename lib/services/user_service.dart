@@ -99,6 +99,11 @@ class UserService {
     }
   }
 
+  /// Get user by ID (alias for getUserData for clarity)
+  Future<Map<String, dynamic>?> getUserById(String uid) async {
+    return getUserData(uid);
+  }
+
   Future<void> updateUserRole(String uid, String role) async {
     try {
       await _firestore.collection(usersCollection).doc(uid).set({

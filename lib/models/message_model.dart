@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Message model for chat messages
 /// Supports text and audio message types
+/// Includes WhatsApp-like read/unread functionality
 class MessageModel {
   final String id;
   final String senderId;
@@ -9,6 +10,7 @@ class MessageModel {
   final String? text;
   final String? audioUrl;
   final DateTime createdAt;
+  final bool isSeen; // ✅ NEW: WhatsApp-like seen status
 
   MessageModel({
     required this.id,
@@ -17,6 +19,7 @@ class MessageModel {
     this.text,
     this.audioUrl,
     required this.createdAt,
+    this.isSeen = false, // Default to false (unread)
   });
 
   /// Create MessageModel from Firestore document
@@ -30,6 +33,7 @@ class MessageModel {
       text: data['text'],
       audioUrl: data['audioUrl'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isSeen: data['isSeen'] ?? false, // ✅ NEW: Read seen status from Firestore
     );
   }
 
@@ -41,6 +45,7 @@ class MessageModel {
       'text': text,
       'audioUrl': audioUrl,
       'createdAt': FieldValue.serverTimestamp(),
+      'isSeen': isSeen, // ✅ NEW: Include seen status
     };
   }
 

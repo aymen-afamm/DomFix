@@ -74,6 +74,9 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {}); // Rebuild to update send button state
     });
     
+    // ✅ NEW: Mark messages as seen when opening chat
+    _markMessagesAsSeenAndResetCount();
+    
     // Run diagnostic test after 3 seconds to allow UI to settle
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
@@ -88,6 +91,25 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// ✅ NEW: Mark messages as seen and reset unread count
+  /// Called when user opens ChatScreen
+  Future<void> _markMessagesAsSeenAndResetCount() async {
+    try {
+      // Mark all messages from other user as seen
+      await _chatService.markMessagesAsSeen(
+        chatId: _chatId,
+        otherUserId: widget.otherUserId,
+      );
+      
+      // Reset unread count for current user
+      await _chatService.resetUnreadCount(_chatId);
+      
+      debugPrint('[ChatScreen] ✅ Messages marked as seen and unread count reset');
+    } catch (e) {
+      debugPrint('[ChatScreen] ❌ Error marking messages as seen: $e');
+    }
   }
 
   /// Send text message to Firestore
@@ -432,17 +454,39 @@ class _ChatScreenState extends State<ChatScreen> {
             child: _buildMessageContent(message),
           ),
           const SizedBox(height: 4),
-          // Timestamp
-          Text(
-            message.getFormattedTime(),
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: AppColors.onSurfaceVariant.withValues(alpha: 0.4),
-            ),
+          // ✅ NEW: Timestamp with WhatsApp-like checkmarks
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                message.getFormattedTime(),
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.onSurfaceVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              // ✅ NEW: Show checkmarks for sent messages
+              if (isCurrentUser) ...[
+                const SizedBox(width: 4),
+                _buildSeenIndicator(message.isSeen),
+              ],
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  /// ✅ NEW: WhatsApp-like seen indicator
+  /// Shows ✓ (sent) or ✓✓ (seen with blue color)
+  Widget _buildSeenIndicator(bool isSeen) {
+    return Icon(
+      Icons.done_all, // Double checkmark
+      size: 14,
+      color: isSeen 
+          ? const Color(0xFF00A5F4) // WhatsApp blue
+          : AppColors.onSurfaceVariant.withValues(alpha: 0.4), // Gray
     );
   }
 

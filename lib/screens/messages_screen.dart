@@ -281,6 +281,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   chatId: chatId,
                   chatData: chatData,
                   currentUserId: currentUserId,
+                  chatService: _chatService, // ✅ NEW: Pass ChatService
                 );
               },
               childCount: chats.length,
@@ -294,15 +295,18 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
 /// Individual Chat List Item
 /// Fetches other user's data and displays chat preview
+/// ✅ NEW: Shows WhatsApp-like unread count badge
 class _ChatListItem extends StatelessWidget {
   final String chatId;
   final Map<String, dynamic> chatData;
   final String currentUserId;
+  final ChatService chatService; // ✅ NEW
 
   const _ChatListItem({
     required this.chatId,
     required this.chatData,
     required this.currentUserId,
+    required this.chatService, // ✅ NEW
   });
 
   @override
@@ -334,6 +338,7 @@ class _ChatListItem extends StatelessWidget {
             lastMessage: chatData['lastMessage'] ?? '',
             timestamp: chatData['lastMessageTime'],
             isUnread: false,
+            unreadCount: 0, // ✅ FIX: Added missing parameter
             otherUserId: otherUserId,
           );
         }
@@ -342,8 +347,9 @@ class _ChatListItem extends StatelessWidget {
         final name = userData['name'] ?? userData['email'] ?? 'Unknown';
         final photoUrl = userData['profileImage'] ?? userData['photoUrl'];
 
-        // Check if unread (simple logic: can be enhanced)
-        final isUnread = _isUnread(chatData);
+        // ✅ NEW: Get unread count from ChatService
+        final unreadCount = chatService.getUnreadCount(chatData);
+        final isUnread = unreadCount > 0;
 
         return _buildChatItem(
           context: context,
@@ -352,6 +358,7 @@ class _ChatListItem extends StatelessWidget {
           lastMessage: chatData['lastMessage'] ?? '',
           timestamp: chatData['lastMessageTime'],
           isUnread: isUnread,
+          unreadCount: unreadCount, // ✅ NEW: Pass unread count
           otherUserId: otherUserId,
         );
       },
@@ -359,8 +366,7 @@ class _ChatListItem extends StatelessWidget {
   }
 
   bool _isUnread(Map<String, dynamic> chatData) {
-    // Simple unread logic: can be enhanced with read receipts
-    // For now, randomly show some as unread for demo
+    // ✅ DEPRECATED: Now using unreadCount from Firestore
     return chatData['unread'] == true;
   }
 
@@ -415,6 +421,7 @@ class _ChatListItem extends StatelessWidget {
     required String lastMessage,
     Timestamp? timestamp,
     required bool isUnread,
+    required int unreadCount, // ✅ NEW: Unread count parameter
     required String otherUserId,
   }) {
     final timeString = _formatTimestamp(timestamp);
@@ -544,20 +551,29 @@ class _ChatListItem extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (isUnread) ...[
+                      // ✅ NEW: WhatsApp-like unread count badge
+                      if (unreadCount > 0) ...[
                         const SizedBox(width: 8),
                         Container(
-                          width: 8,
-                          height: 8,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
                             color: AppColors.neonAccent,
+                            borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.neonAccent.withValues(alpha: 0.5),
+                                color: AppColors.neonAccent.withValues(alpha: 0.3),
                                 blurRadius: 8,
+                                spreadRadius: 1,
                               ),
                             ],
+                          ),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : unreadCount.toString(),
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF0B0F14), // Dark background color
+                            ),
                           ),
                         ),
                       ],

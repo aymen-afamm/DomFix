@@ -33,6 +33,7 @@ class ChatService {
   /// Send a text message
   /// CRITICAL: Uses static generateChatId to ensure consistency
   /// Creates chat document BEFORE sending message to avoid permission errors
+  /// ✅ NEW: Implements WhatsApp-like unread count system
   Future<void> sendMessage({
     required String receiverId,
     required String text,
@@ -68,42 +69,51 @@ class ChatService {
       debugPrint('[ChatService]   Receiver: $receiverId');
       debugPrint('[ChatService]   Chat ID: $chatId');
       debugPrint('[ChatService]   Message: "${text.trim()}"');
-      debugPrint('[ChatService]   Firestore Path: chats/$chatId');
-      debugPrint('[ChatService]   Messages Path: chats/$chatId/messages');
 
-      // STEP 1: Create/update chat document FIRST
-      debugPrint('[ChatService] 💾 STEP 1: Creating/updating chat document...');
+      // ✅ Use batch write for atomic operations
+      final batch = _firestore.batch();
       final chatRef = _firestore.collection('chats').doc(chatId);
+
+      // STEP 1: Create/update chat document with unread counts
+      debugPrint('[ChatService] 💾 STEP 1: Creating/updating chat document...');
       
       final chatData = {
         'participants': [currentUserId, receiverId],
         'lastMessage': text.trim(),
         'lastMessageTime': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
+        // ✅ NEW: Increment unread count for receiver
+        'unreadCount_$receiverId': FieldValue.increment(1),
+        // ✅ NEW: Reset unread count for sender (they're actively chatting)
+        'unreadCount_$currentUserId': 0,
       };
       
-      debugPrint('[ChatService] Chat data: $chatData');
+      debugPrint('[ChatService] 📊 Unread count update:');
+      debugPrint('[ChatService]   Incrementing for receiver: $receiverId');
+      debugPrint('[ChatService]   Resetting for sender: $currentUserId');
       
-      await chatRef.set(chatData, SetOptions(merge: true));
+      batch.set(chatRef, chatData, SetOptions(merge: true));
 
-      debugPrint('[ChatService] ✅ Chat document created/updated successfully');
-
-      // STEP 2: Add message to subcollection
+      // STEP 2: Add message to subcollection with isSeen = false
       debugPrint('[ChatService] 💾 STEP 2: Adding message to subcollection...');
       
+      final messageRef = chatRef.collection('messages').doc();
       final messageData = {
         'senderId': currentUserId,
         'type': 'text',
         'text': text.trim(),
         'audioUrl': null,
         'createdAt': FieldValue.serverTimestamp(),
+        'isSeen': false, // ✅ NEW: Default to unseen
       };
       
       debugPrint('[ChatService] Message data: $messageData');
+      batch.set(messageRef, messageData);
 
-      final messageRef = await chatRef.collection('messages').add(messageData);
+      // Commit batch
+      await batch.commit();
       
-      debugPrint('[ChatService] ✅ Message added successfully!');
+      debugPrint('[ChatService] ✅ Message sent successfully!');
       debugPrint('[ChatService] Message ID: ${messageRef.id}');
       debugPrint('[ChatService] Full path: chats/$chatId/messages/${messageRef.id}');
       debugPrint('═══════════════════════════════════════');
@@ -119,6 +129,7 @@ class ChatService {
 
   /// Send an audio message
   /// CRITICAL: Uses static generateChatId to ensure consistency
+  /// ✅ NEW: Implements WhatsApp-like unread count system
   Future<void> sendAudioMessage({
     required String receiverId,
     required String audioUrl,
@@ -139,28 +150,37 @@ class ChatService {
       debugPrint('[ChatService] Sending audio message');
       debugPrint('[ChatService] Chat ID: $chatId');
 
-      // CRITICAL: Create/update chat document FIRST
+      // ✅ Use batch write for atomic operations
+      final batch = _firestore.batch();
       final chatRef = _firestore.collection('chats').doc(chatId);
       
-      await chatRef.set({
+      // Update chat document with unread counts
+      batch.set(chatRef, {
         'participants': [currentUserId, receiverId],
         'lastMessage': '🎤 Audio message',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
+        // ✅ NEW: Increment unread count for receiver
+        'unreadCount_$receiverId': FieldValue.increment(1),
+        // ✅ NEW: Reset unread count for sender
+        'unreadCount_$currentUserId': 0,
       }, SetOptions(merge: true));
 
       debugPrint('[ChatService] Chat document created/updated');
 
       // Create audio message document
+      final messageRef = chatRef.collection('messages').doc();
       final messageData = {
         'senderId': currentUserId,
         'type': 'audio',
         'text': null,
         'audioUrl': audioUrl.trim(),
         'createdAt': FieldValue.serverTimestamp(),
+        'isSeen': false, // ✅ NEW: Default to unseen
       };
 
-      await chatRef.collection('messages').add(messageData);
+      batch.set(messageRef, messageData);
+      await batch.commit();
 
       debugPrint('[ChatService] Audio message sent successfully');
     } catch (e) {
@@ -368,6 +388,96 @@ class ChatService {
     } catch (e) {
       debugPrint('[ChatService] Error deleting message: $e');
       rethrow;
+    }
+  }
+
+  /// ✅ NEW: Mark all messages from other user as seen
+  /// Called when user opens ChatScreen
+  /// Uses efficient batch update to mark multiple messages at once
+  Future<void> markMessagesAsSeen({
+    required String chatId,
+    required String otherUserId,
+  }) async {
+    try {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[ChatService] 👁️ markMessagesAsSeen() CALLED');
+      debugPrint('[ChatService] Chat ID: $chatId');
+      debugPrint('[ChatService] Other User: $otherUserId');
+      debugPrint('[ChatService] Current User: $currentUserId');
+
+      // Query unseen messages from other user
+      final unseenMessages = await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .where('senderId', isEqualTo: otherUserId)
+          .where('isSeen', isEqualTo: false)
+          .get();
+
+      if (unseenMessages.docs.isEmpty) {
+        debugPrint('[ChatService] ✅ No unseen messages to mark');
+        debugPrint('═══════════════════════════════════════');
+        return;
+      }
+
+      debugPrint('[ChatService] 📊 Found ${unseenMessages.docs.length} unseen messages');
+
+      // Use batch write for efficiency
+      final batch = _firestore.batch();
+      
+      for (var doc in unseenMessages.docs) {
+        batch.update(doc.reference, {'isSeen': true});
+        debugPrint('[ChatService] ✅✅ Marking message ${doc.id} as seen');
+      }
+
+      await batch.commit();
+      
+      debugPrint('[ChatService] ✅ Successfully marked ${unseenMessages.docs.length} messages as seen');
+      debugPrint('═══════════════════════════════════════');
+    } catch (e, stackTrace) {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[ChatService] ❌ ERROR IN markMessagesAsSeen()');
+      debugPrint('[ChatService] Error: $e');
+      debugPrint('[ChatService] StackTrace: $stackTrace');
+      debugPrint('═══════════════════════════════════════');
+      rethrow;
+    }
+  }
+
+  /// ✅ NEW: Reset unread count for current user
+  /// Called when user opens ChatScreen
+  Future<void> resetUnreadCount(String chatId) async {
+    try {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[ChatService] 🔄 resetUnreadCount() CALLED');
+      debugPrint('[ChatService] Chat ID: $chatId');
+      debugPrint('[ChatService] Current User: $currentUserId');
+
+      await _firestore.collection('chats').doc(chatId).update({
+        'unreadCount_$currentUserId': 0,
+      });
+
+      debugPrint('[ChatService] ✅ Unread count reset to 0 for user: $currentUserId');
+      debugPrint('═══════════════════════════════════════');
+    } catch (e, stackTrace) {
+      debugPrint('═══════════════════════════════════════');
+      debugPrint('[ChatService] ❌ ERROR IN resetUnreadCount()');
+      debugPrint('[ChatService] Error: $e');
+      debugPrint('[ChatService] StackTrace: $stackTrace');
+      debugPrint('═══════════════════════════════════════');
+      rethrow;
+    }
+  }
+
+  /// ✅ NEW: Get unread count for current user in a specific chat
+  /// Used to display badge in MessagesScreen
+  int getUnreadCount(Map<String, dynamic> chatData) {
+    try {
+      final unreadCount = chatData['unreadCount_$currentUserId'] as int? ?? 0;
+      return unreadCount;
+    } catch (e) {
+      debugPrint('[ChatService] Error getting unread count: $e');
+      return 0;
     }
   }
 }

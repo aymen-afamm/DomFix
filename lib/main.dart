@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/splash_screen.dart';
+import 'screens/chat_screen.dart';
+import 'services/fcm_service.dart';
+import 'services/user_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -8,12 +12,82 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  final FCMService _fcmService = FCMService();
+  final UserService _userService = UserService();
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFCM();
+  }
+
+  /// Initialize FCM and setup notification click handler
+  Future<void> _initializeFCM() async {
+    // Wait for user to be authenticated
+    FirebaseAuth.instance.authStateChanges().listen((User? user) async {
+      if (user != null) {
+        debugPrint('[App] 👤 User authenticated: ${user.uid}');
+        
+        // Initialize FCM
+        await _fcmService.initialize();
+        
+        // Setup notification click handler
+        _fcmService.onNotificationClick = (chatId, senderId) {
+          _navigateToChat(chatId, senderId);
+        };
+      } else {
+        debugPrint('[App] 👤 User logged out');
+        // Delete FCM token on logout
+        await _fcmService.deleteToken();
+      }
+    });
+  }
+
+  /// Navigate to ChatScreen when notification is clicked
+  Future<void> _navigateToChat(String chatId, String senderId) async {
+    try {
+      debugPrint('[App] 🚀 Navigating to chat: $chatId');
+      
+      // Get sender details
+      final senderData = await _userService.getUserById(senderId);
+      
+      if (senderData != null) {
+        final senderName = senderData['name'] ?? 'User';
+        final senderRole = senderData['role'] ?? 'client';
+        
+        // Navigate to ChatScreen
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              otherUserId: senderId,
+              otherUserName: senderName,
+              otherUserRole: senderRole,
+            ),
+          ),
+        );
+        
+        debugPrint('[App] ✅ Navigated to chat successfully');
+      } else {
+        debugPrint('[App] ❌ Sender data not found');
+      }
+    } catch (e) {
+      debugPrint('[App] ❌ Error navigating to chat: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'DomFix',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark,
