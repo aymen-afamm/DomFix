@@ -173,8 +173,8 @@ class ChatService {
   /// Returns messages ordered by createdAt in ascending order (oldest first)
   /// Use with StreamBuilder for real-time updates
   Stream<List<MessageModel>> getMessagesStream(String chatId) {
-    debugPrint('[ChatService] 👂 Listening to messages for chatId: $chatId');
-    debugPrint('[ChatService] Path: chats/$chatId/messages');
+    // Only log stream initialization once
+    debugPrint('[ChatService] 👂 Starting message stream for: $chatId');
     
     return _firestore
         .collection('chats')
@@ -183,7 +183,19 @@ class ChatService {
         .orderBy('createdAt', descending: false)
         .snapshots()
         .map((snapshot) {
-      debugPrint('[ChatService] 📬 Received ${snapshot.docs.length} messages');
+      // Only log when there are actual changes
+      if (snapshot.docChanges.isNotEmpty) {
+        debugPrint('[ChatService] 📬 Stream update: ${snapshot.docs.length} messages (${snapshot.docChanges.length} changes)');
+        
+        // Log only new messages
+        for (var change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.added) {
+            final data = change.doc.data() as Map<String, dynamic>;
+            debugPrint('[ChatService] ➕ New message: ${data['text']} (from: ${data['senderId']})');
+          }
+        }
+      }
+      
       return snapshot.docs.map((doc) {
         return MessageModel.fromFirestore(doc);
       }).toList();
@@ -245,6 +257,99 @@ class ChatService {
         .where('participants', arrayContains: currentUserId)
         .orderBy('lastMessageTime', descending: true)
         .snapshots();
+  }
+
+  /// Enhanced diagnostic method for troubleshooting real-time issues
+  Future<void> diagnosticChatAccess(String chatId) async {
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('[ChatService] 🔍 DIAGNOSTIC: Starting chat access test');
+    debugPrint('[ChatService] 🔍 DIAGNOSTIC: Chat ID: $chatId');
+    debugPrint('[ChatService] 🔍 DIAGNOSTIC: Current User: $currentUserId');
+    debugPrint('═══════════════════════════════════════');
+    
+    try {
+      // Test 1: Check if chat document exists and user has access
+      debugPrint('[ChatService] 🔍 TEST 1: Checking chat document access...');
+      final chatDoc = await _firestore.collection('chats').doc(chatId).get();
+      debugPrint('[ChatService] 🔍 Chat document exists: ${chatDoc.exists}');
+      
+      if (chatDoc.exists) {
+        final chatData = chatDoc.data()!;
+        final participants = List<String>.from(chatData['participants'] ?? []);
+        debugPrint('[ChatService] 🔍 Chat participants: $participants');
+        debugPrint('[ChatService] 🔍 User in participants: ${participants.contains(currentUserId)}');
+        debugPrint('[ChatService] 🔍 Last message: ${chatData['lastMessage']}');
+        debugPrint('[ChatService] 🔍 Last message time: ${chatData['lastMessageTime']}');
+        
+        if (!participants.contains(currentUserId)) {
+          debugPrint('[ChatService] ❌ ISSUE FOUND: Current user NOT in participants array!');
+          debugPrint('[ChatService] ❌ This will cause Firestore rules to block access');
+        }
+      } else {
+        debugPrint('[ChatService] ❌ ISSUE FOUND: Chat document does not exist!');
+      }
+      
+      // Test 2: Check messages subcollection access
+      debugPrint('[ChatService] 🔍 TEST 2: Checking messages subcollection...');
+      final messagesQuery = await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .orderBy('createdAt', descending: false)
+          .limit(10)
+          .get();
+      
+      debugPrint('[ChatService] 🔍 Messages count: ${messagesQuery.docs.length}');
+      
+      for (var i = 0; i < messagesQuery.docs.length; i++) {
+        final doc = messagesQuery.docs[i];
+        final data = doc.data();
+        debugPrint('[ChatService] 🔍 Message $i:');
+        debugPrint('[ChatService] 🔍   ID: ${doc.id}');
+        debugPrint('[ChatService] 🔍   Text: ${data['text']}');
+        debugPrint('[ChatService] 🔍   Sender: ${data['senderId']}');
+        debugPrint('[ChatService] 🔍   Type: ${data['type']}');
+        debugPrint('[ChatService] 🔍   CreatedAt: ${data['createdAt']}');
+      }
+      
+      // Test 3: Test real-time listener
+      debugPrint('[ChatService] 🔍 TEST 3: Testing real-time listener...');
+      final stream = _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .orderBy('createdAt', descending: false)
+          .snapshots();
+      
+      final subscription = stream.listen(
+        (snapshot) {
+          debugPrint('[ChatService] 🔍 ✅ Real-time update received!');
+          debugPrint('[ChatService] 🔍 Messages in update: ${snapshot.docs.length}');
+          debugPrint('[ChatService] 🔍 Document changes: ${snapshot.docChanges.length}');
+          for (var change in snapshot.docChanges) {
+            debugPrint('[ChatService] 🔍 Change type: ${change.type}');
+            debugPrint('[ChatService] 🔍 Changed doc: ${change.doc.id}');
+          }
+        },
+        onError: (error) {
+          debugPrint('[ChatService] 🔍 ❌ Stream error: $error');
+          debugPrint('[ChatService] 🔍 This indicates a Firestore rules or permission issue');
+        },
+      );
+      
+      // Cancel diagnostic listener after 10 seconds
+      Future.delayed(const Duration(seconds: 10), () {
+        subscription.cancel();
+        debugPrint('[ChatService] 🔍 Diagnostic test completed');
+        debugPrint('═══════════════════════════════════════');
+      });
+      
+    } catch (e, stackTrace) {
+      debugPrint('[ChatService] 🔍 ❌ DIAGNOSTIC ERROR: $e');
+      debugPrint('[ChatService] 🔍 StackTrace: $stackTrace');
+      debugPrint('[ChatService] 🔍 This indicates a Firestore rules or authentication issue');
+      debugPrint('═══════════════════════════════════════');
+    }
   }
 
   /// Delete a message

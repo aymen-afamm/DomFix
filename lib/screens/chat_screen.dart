@@ -33,6 +33,7 @@ class _ChatScreenState extends State<ChatScreen> {
   
   // State
   late String _chatId;
+  late Stream<List<MessageModel>> _messagesStream;
   bool _isSending = false;
 
   @override
@@ -56,17 +57,29 @@ class _ChatScreenState extends State<ChatScreen> {
     // CRITICAL: Use static method to ensure consistency
     _chatId = ChatService.generateChatId(currentUserId, otherUserId);
     
+    // CRITICAL: Initialize stream ONCE in initState to prevent recreation on rebuild
+    _messagesStream = _chatService.getMessagesStream(_chatId);
+    
     debugPrint('═══════════════════════════════════════');
     debugPrint('[ChatScreen] 💬 CHAT INITIALIZED');
     debugPrint('[ChatScreen] Current User: $currentUserId');
     debugPrint('[ChatScreen] Other User: $otherUserId');
     debugPrint('[ChatScreen] Generated Chat ID: $_chatId');
     debugPrint('[ChatScreen] Listening to: chats/$_chatId/messages');
+    debugPrint('[ChatScreen] Stream initialized and cached');
     debugPrint('═══════════════════════════════════════');
     
     // Add listener to update UI when text changes
     _messageController.addListener(() {
       setState(() {}); // Rebuild to update send button state
+    });
+    
+    // Run diagnostic test after 3 seconds to allow UI to settle
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        debugPrint('[ChatScreen] 🔍 Running diagnostic test...');
+        _chatService.diagnosticChatAccess(_chatId);
+      }
     });
   }
 
@@ -274,8 +287,19 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Chat area with real-time messages using StreamBuilder
   Widget _buildChatArea() {
     return StreamBuilder<List<MessageModel>>(
-      stream: _chatService.getMessagesStream(_chatId),
+      stream: _messagesStream, // Use cached stream
       builder: (context, snapshot) {
+        // Log connection state changes
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          debugPrint('[ChatScreen] 🔄 StreamBuilder: Initial loading');
+        } else if (snapshot.connectionState == ConnectionState.active && snapshot.hasData) {
+          debugPrint('[ChatScreen] 🔄 StreamBuilder: Active with ${snapshot.data!.length} messages');
+        }
+        
+        if (snapshot.hasError) {
+          debugPrint('[ChatScreen] ❌ StreamBuilder Error: ${snapshot.error}');
+        }
+        
         // Loading state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
@@ -287,6 +311,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
         // Error state
         if (snapshot.hasError) {
+          debugPrint('[ChatScreen] ❌ Showing error state');
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -302,6 +327,15 @@ class _ChatScreenState extends State<ChatScreen> {
                   style: GoogleFonts.inter(
                     color: AppColors.onSurfaceVariant,
                   ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${snapshot.error}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.red,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),

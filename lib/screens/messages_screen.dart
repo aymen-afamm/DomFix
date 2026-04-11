@@ -24,6 +24,16 @@ class _MessagesScreenState extends State<MessagesScreen> {
   String _searchQuery = '';
 
   @override
+  void initState() {
+    super.initState();
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('[💬 MessagesScreen] INITIALIZED');
+    debugPrint('[💬 MessagesScreen] Current User: ${_auth.currentUser?.uid}');
+    debugPrint('[💬 MessagesScreen] User Email: ${_auth.currentUser?.email}');
+    debugPrint('═══════════════════════════════════════');
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -171,6 +181,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
     return StreamBuilder<QuerySnapshot>(
       stream: _chatService.getUserChats(),
       builder: (context, snapshot) {
+        // Debug logging
+        if (snapshot.connectionState == ConnectionState.active) {
+          debugPrint('[💬 MessagesScreen] 🔄 Stream active: ${snapshot.hasData ? snapshot.data!.docs.length : 0} chats');
+        }
+        
         // Loading state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return SliverFillRemaining(
@@ -406,6 +421,14 @@ class _ChatListItem extends StatelessWidget {
 
     return InkWell(
       onTap: () {
+        // Debug logging
+        debugPrint('═══════════════════════════════════════');
+        debugPrint('[💬 MessagesScreen] 👆 Chat tapped');
+        debugPrint('[💬 MessagesScreen] Other User ID: $otherUserId');
+        debugPrint('[💬 MessagesScreen] Other User Name: $name');
+        debugPrint('[💬 MessagesScreen] Navigating to ChatScreen...');
+        debugPrint('═══════════════════════════════════════');
+        
         // Navigate to chat screen
         Navigator.push(
           context,

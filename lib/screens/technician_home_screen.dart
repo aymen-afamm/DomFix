@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/technician_location_service.dart';
 import '../theme/app_colors.dart';
 import 'settings_screen.dart';
+import 'messages_screen.dart';
 
 class TechnicianHomeScreen extends StatefulWidget {
   const TechnicianHomeScreen({super.key});
@@ -18,6 +19,7 @@ class _TechnicianHomeScreenState extends State<TechnicianHomeScreen> with Widget
 
   final List<Widget> _screens = const [
     TechnicianDashboard(),
+    MessagesScreen(), // ✅ ADDED: Messages screen for technician
     TechnicianJobsScreen(),
     TechnicianProfileScreen(),
     SettingsScreen(),
@@ -86,9 +88,10 @@ class _TechnicianHomeScreenState extends State<TechnicianHomeScreen> with Widget
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildNavItem(Icons.dashboard_outlined, Icons.dashboard, 'DASHBOARD', 0),
-          _buildNavItem(Icons.work_outline, Icons.work, 'JOBS', 1),
-          _buildNavItem(Icons.person_outline, Icons.person, 'PROFILE', 2),
-          _buildNavItem(Icons.settings_outlined, Icons.settings, 'SETTINGS', 3),
+          _buildNavItem(Icons.chat_bubble_outline, Icons.chat_bubble, 'MESSAGES', 1),
+          _buildNavItem(Icons.work_outline, Icons.work, 'JOBS', 2),
+          _buildNavItem(Icons.person_outline, Icons.person, 'PROFILE', 3),
+          _buildNavItem(Icons.settings_outlined, Icons.settings, 'SETTINGS', 4),
         ],
       ),
     );
