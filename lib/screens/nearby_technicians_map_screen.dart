@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 import '../services/technician_location_service.dart';
 import '../theme/app_colors.dart';
 import 'chat_screen.dart';
+import 'technician_profile_screen.dart';
 
 String _timeAgo(DateTime dt) {
   final diff = DateTime.now().difference(dt);
@@ -574,7 +575,17 @@ class _TechnicianPreviewCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: onClose,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TechnicianProfileScreen(
+                              technicianId: tech.id,
+                              initialName: 'Technician ${tech.id.substring(0, 6)}',
+                            ),
+                          ),
+                        );
+                      },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.neonAccent,
                         side: BorderSide(
