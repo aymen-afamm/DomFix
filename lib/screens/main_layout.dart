@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../widgets/domfix_glass_bottom_nav.dart';
-import 'ai_chat_screen_content.dart';
 import 'control_screen.dart';
 import 'find_pros_screen_content.dart';
 import 'home_screen_content.dart';
+import 'messages_screen.dart';
 import 'settings_screen.dart';
 
 /// Exposes tab switching to descendants (e.g. home shortcuts) without pushing routes.
@@ -44,7 +44,7 @@ class _MainLayoutState extends State<MainLayout> with SingleTickerProviderStateM
 
   static const List<Widget> _tabBodies = [
     HomeScreenContent(),
-    AIChatScreenContent(),
+    MessagesScreen(),
     FindProsScreenContent(),
     ControlScreen(),
     SettingsScreen(),
