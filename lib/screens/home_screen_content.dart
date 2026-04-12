@@ -1,8 +1,11 @@
 import 'dart:ui';
+import 'dart:math' show cos, sqrt, asin;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/app_colors.dart';
 import '../services/user_service.dart';
@@ -45,10 +48,14 @@ class _HomeScreenContentState extends State<HomeScreenContent>
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
 
+  double? _userLat;
+  double? _userLng;
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _initLocation();
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
@@ -74,6 +81,66 @@ class _HomeScreenContentState extends State<HomeScreenContent>
       _userName = data?['name'] ?? user.displayName ?? user.email?.split('@').first ?? 'User';
       _userPhotoUrl = data?['profileImage'] ?? user.photoURL;
     });
+  }
+
+  Future<void> _initLocation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Load cached location instantly if available
+      final cachedLat = prefs.getDouble('cachedLat');
+      final cachedLng = prefs.getDouble('cachedLng');
+      
+      if (cachedLat != null && cachedLng != null && mounted) {
+        setState(() {
+          _userLat = cachedLat;
+          _userLng = cachedLng;
+        });
+      }
+
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        print("Location services disabled");
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        print("Permission permanently denied");
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // Cache the new precise location
+      await prefs.setDouble('cachedLat', position.latitude);
+      await prefs.setDouble('cachedLng', position.longitude);
+
+      if (mounted) {
+        setState(() {
+          _userLat = position.latitude;
+          _userLng = position.longitude;
+        });
+        print("HOME LOCATION: $_userLat, $_userLng");
+      }
+    } catch (e) {
+      print("Location error: $e");
+    }
+  }
+
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    var p = 0.017453292519943295;
+    var c = cos;
+    var a = 0.5 - c((lat2 - lat1) * p)/2 + 
+        c(lat1 * p) * c(lat2 * p) * 
+        (1 - c((lon2 - lon1) * p))/2;
+    return 12742 * asin(sqrt(a)); // KM
   }
 
   // ──────────────────────────────────────────── BUILD ─────
@@ -490,45 +557,118 @@ class _HomeScreenContentState extends State<HomeScreenContent>
         const SizedBox(height: 16),
         SizedBox(
           height: 230,
-          child: StreamBuilder<QuerySnapshot>(
+          child: _userLat == null || _userLng == null 
+            ? Center(
+                child: CircularProgressIndicator(color: AppColors.neonAccent),
+              )
+            : StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('users')
                 .where('role', isEqualTo: 'technician')
-                .where('onboardingCompleted', isEqualTo: true)
-                .limit(10)
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return _buildTechnicianSkeletons();
+                return Center(child: CircularProgressIndicator(color: AppColors.neonAccent));
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Error loading technicians',
+                    style: GoogleFonts.inter(color: AppColors.onSurfaceVariant),
+                  ),
+                );
               }
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return _buildTechnicianSkeletons(); // placeholder
+                print("DEBUG: Zero users found with role=='technician'!");
+                return Center(
+                  child: Text(
+                    'No technicians available',
+                    style: GoogleFonts.inter(color: AppColors.onSurfaceVariant),
+                  ),
+                );
               }
+
               final docs = snapshot.data!.docs;
+              
+              print("USER LOCATION: $_userLat, $_userLng");
+              print("TOTAL TECHS: ${docs.length}");
+
+              final List<Map<String, dynamic>> nearbyTechs = [];
+              for (var doc in docs) {
+                final data = doc.data() as Map<String, dynamic>;
+                print("DEBUG EXAMINING DOC: ${doc.id} | data: $data");
+                
+                final dynamic techLatRaw = data['lat'] ?? data['location']?['lat'];
+                final dynamic techLngRaw = data['lng'] ?? data['location']?['lng'];
+                
+                if (techLatRaw == null || techLngRaw == null) {
+                  print("DEBUG SKIPPED: ${doc.id} due to NULL lat/lng (found lat=$techLatRaw, lng=$techLngRaw)");
+                  continue;
+                }
+
+                final techLat = (techLatRaw as num).toDouble();
+                final techLng = (techLngRaw as num).toDouble();
+
+                final distance = _calculateDistance(_userLat!, _userLng!, techLat, techLng);
+
+                print("TECH: ${data['fullName'] ?? data['name']}");
+                print("Distance: $distance km");
+
+                if (distance <= 10) {
+                  data['calculated_distance'] = distance;
+                  data['doc_id'] = doc.id;
+                  nearbyTechs.add(data);
+                } else {
+                  print("DEBUG SKIPPED: ${doc.id} due to distance $distance > 10km");
+                }
+              }
+
+              print("NEARBY TECHS: ${nearbyTechs.length}");
+
+              if (nearbyTechs.isEmpty) {
+                return Center(
+                  child: Text(
+                    'No technicians nearby',
+                    style: GoogleFonts.inter(color: AppColors.onSurfaceVariant),
+                  ),
+                );
+              }
+
+              nearbyTechs.sort((a, b) {
+                 final ratingA = (a['rating'] as num?)?.toDouble() ?? 0.0;
+                 final ratingB = (b['rating'] as num?)?.toDouble() ?? 0.0;
+                 return ratingB.compareTo(ratingA);
+              });
+              
+              final finalList = nearbyTechs.take(4).toList();
+
               return ListView.separated(
                 scrollDirection: Axis.horizontal,
                 clipBehavior: Clip.none,
-                itemCount: docs.length,
+                itemCount: finalList.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 16),
                 itemBuilder: (context, index) {
-                  final data = docs[index].data() as Map<String, dynamic>;
-                  final techId = docs[index].id;
+                  final data = finalList[index];
+                  final techId = data['doc_id'] as String;
+                  
+                  final fullName = data['fullName'] ?? data['name'] ?? 'Technician';
+
                   return _TechnicianCard(
                     techId: techId,
-                    name: data['name'] ?? 'Technician',
-                    job: _extractJob(data),
-                    rating: (data['rating'] as num?)?.toDouble() ?? 4.5,
-                    distance: (data['distance'] as num?)?.toDouble(),
+                    name: fullName,
+                    job: data['speciality'] ?? _extractJob(data),
+                    rating: (data['rating'] as num?)?.toDouble() ?? 0.0,
+                    distance: data['calculated_distance'] as double,
                     photoUrl: data['profileImage'],
-                    isAvailable: data['isAvailable'] ?? true,
-                    onMessage: () => _navigateToChat(techId, data['name'] ?? 'Technician'),
+                    isAvailable: data['isOnline'] == true,
+                    onMessage: () => _navigateToChat(techId, fullName),
                     onViewProfile: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => TechnicianProfileScreen(
                             technicianId: techId,
-                            initialName: data['name'],
+                            initialName: fullName,
                           ),
                         ),
                       );
@@ -557,12 +697,14 @@ class _HomeScreenContentState extends State<HomeScreenContent>
       scrollDirection: Axis.horizontal,
       itemCount: 3,
       separatorBuilder: (_, __) => const SizedBox(width: 16),
-      itemBuilder: (_, __) => Container(
-        width: 256,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.whiteBorder5),
+      itemBuilder: (_, __) => _Shimmer(
+        child: Container(
+          width: 256,
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.whiteBorder5),
+          ),
         ),
       ),
     );
@@ -1410,5 +1552,48 @@ class _RecentMessageTile extends StatelessWidget {
     }
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[d.month - 1]} ${d.day}';
+  }
+}
+
+/// Simple shimmer container animation
+class _Shimmer extends StatefulWidget {
+  final Widget child;
+  const _Shimmer({super.key, required this.child});
+
+  @override
+  State<_Shimmer> createState() => _ShimmerState();
+}
+
+class _ShimmerState extends State<_Shimmer>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, child) => Opacity(
+        opacity: 0.4 + _anim.value * 0.35,
+        child: child,
+      ),
+      child: widget.child,
+    );
   }
 }
