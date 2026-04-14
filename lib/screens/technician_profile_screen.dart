@@ -1,6 +1,9 @@
 import 'dart:ui';
+import 'dart:math' show cos, sqrt, asin;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -68,8 +71,7 @@ class TechnicianProfile {
             ))
         .toList();
 
-    // Derive job from specialties if job field missing
-    String job = data['job'] ?? '';
+    String job = data['speciality'] ?? data['job'] ?? '';
     if (job.isEmpty) {
       final specs = data['specialties'] as List<dynamic>?;
       if (specs != null && specs.isNotEmpty) job = specs.first.toString();
@@ -78,7 +80,7 @@ class TechnicianProfile {
 
     return TechnicianProfile(
       id: id,
-      name: data['name'] ?? 'Unknown',
+      name: data['fullName'] ?? data['name'] ?? 'Unknown',
       photoUrl: data['profileImage'] ?? data['photoUrl'],
       job: job,
       bio: data['bio'] ??
@@ -706,13 +708,11 @@ class _TechnicianProfileScreenState extends State<TechnicianProfileScreen>
                 flex: 2,
                 child: GestureDetector(
                   onTap: () {
-                    // TODO: Connect to booking screen
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Booking ${p.name}…'),
-                        backgroundColor: AppColors.surfaceContainerHighest,
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => _BookingBottomSheet(technician: p),
                     );
                   },
                   child: Container(
@@ -1268,6 +1268,206 @@ class _HeaderIconButton extends StatelessWidget {
         child: Center(
           child: Icon(icon, color: AppColors.onSurface, size: 22),
         ),
+      ),
+    );
+  }
+}
+
+class _BookingBottomSheet extends StatefulWidget {
+  final TechnicianProfile technician;
+  const _BookingBottomSheet({required this.technician});
+
+  @override
+  State<_BookingBottomSheet> createState() => _BookingBottomSheetState();
+}
+
+class _BookingBottomSheetState extends State<_BookingBottomSheet> {
+  final _problemController = TextEditingController();
+  final _priceController = TextEditingController();
+  String _urgency = 'Standard';
+  bool _submitting = false;
+
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    var p = 0.017453292519943295;
+    var c = cos;
+    var a = 0.5 - c((lat2 - lat1) * p)/2 + 
+        c(lat1 * p) * c(lat2 * p) * 
+        (1 - c((lon2 - lon1) * p))/2;
+    return 12742 * asin(sqrt(a)); // KM
+  }
+
+  Future<void> _submitRequest() async {
+    if (_problemController.text.trim().isEmpty) return;
+    setState(() => _submitting = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception("Not logged in");
+
+      final prefs = await SharedPreferences.getInstance();
+      final userLat = prefs.getDouble('cachedLat') ?? 0.0;
+      final userLng = prefs.getDouble('cachedLng') ?? 0.0;
+      
+      final techDoc = await FirebaseFirestore.instance.collection('users').doc(widget.technician.id).get();
+      final techData = techDoc.data() ?? {};
+      final dynamic latRaw = techData['lat'] ?? techData['location']?['lat'];
+      final dynamic lngRaw = techData['lng'] ?? techData['location']?['lng'];
+      final techLat = (latRaw as num?)?.toDouble() ?? 0.0;
+      final techLng = (lngRaw as num?)?.toDouble() ?? 0.0;
+
+      final distance = _calculateDistance(userLat, userLng, techLat, techLng);
+
+      final jobRef = FirebaseFirestore.instance.collection('jobs').doc();
+      
+      await jobRef.set({
+        'jobId': jobRef.id,
+        'userId': user.uid,
+        'technicianId': widget.technician.id,
+        'problemDescription': _problemController.text.trim(),
+        'urgency': _urgency,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+        'userLat': userLat,
+        'userLng': userLng,
+        'technicianLat': techLat,
+        'technicianLng': techLng,
+        'distance': distance,
+        if (_priceController.text.trim().isNotEmpty) 'estimatedPrice': _priceController.text.trim(),
+      });
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Request sent exclusively to ${widget.technician.name}!'),
+            backgroundColor: AppColors.primaryContainer,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(color: AppColors.surfaceContainerHighest),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Book ${widget.technician.name}',
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.onSurface,
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.close, color: AppColors.onSurfaceVariant),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text('Problem Description', style: GoogleFonts.inter(color: AppColors.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _problemController,
+            maxLines: 4,
+            style: GoogleFonts.inter(color: AppColors.onSurface),
+            decoration: InputDecoration(
+              hintText: 'Describe what needs fixing...',
+              hintStyle: GoogleFonts.inter(color: AppColors.onSurfaceVariant.withValues(alpha: 0.5)),
+              filled: true,
+              fillColor: AppColors.surfaceContainerLow,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Urgency', style: GoogleFonts.inter(color: AppColors.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _urgency,
+                      dropdownColor: AppColors.surfaceContainerHigh,
+                      style: GoogleFonts.inter(color: AppColors.onSurface),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: AppColors.surfaceContainerLow,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      items: ['Standard', 'Urgent', 'Emergency'].map((String val) {
+                        return DropdownMenuItem(value: val, child: Text(val));
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _urgency = val);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Est. Price (Opt)', style: GoogleFonts.inter(color: AppColors.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _priceController,
+                      style: GoogleFonts.inter(color: AppColors.onSurface),
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: '\$0.00',
+                        hintStyle: GoogleFonts.inter(color: AppColors.onSurfaceVariant.withValues(alpha: 0.5)),
+                        filled: true,
+                        fillColor: AppColors.surfaceContainerLow,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: _submitting ? null : _submitRequest,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.neonAccent,
+                foregroundColor: AppColors.onPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _submitting 
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.onPrimary, strokeWidth: 2))
+                : Text('CONFIRM BOOKING', style: GoogleFonts.spaceGrotesk(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+            ),
+          ),
+        ],
       ),
     );
   }

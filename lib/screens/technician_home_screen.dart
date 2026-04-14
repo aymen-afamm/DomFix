@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/technician_location_service.dart';
 import '../theme/app_colors.dart';
+import '../services/chat_service.dart';
 import 'settings_screen.dart';
 import 'messages_screen.dart';
+import 'chat_screen.dart';
 
 class TechnicianHomeScreen extends StatefulWidget {
   const TechnicianHomeScreen({super.key});
@@ -375,40 +379,228 @@ class _TechnicianDashboardState extends State<TechnicianDashboard> with WidgetsB
   }
 }
 
-class TechnicianJobsScreen extends StatelessWidget {
+class TechnicianJobsScreen extends StatefulWidget {
   const TechnicianJobsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Available Jobs',
-              style: GoogleFonts.spaceGrotesk(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: AppColors.onSurface,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: Center(
-                child: Text(
-                  'No new jobs available',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+  State<TechnicianJobsScreen> createState() => _TechnicianJobsScreenState();
+}
+
+class _TechnicianJobsScreenState extends State<TechnicianJobsScreen> {
+  String _timeAgoInfo(Timestamp? t) {
+    if (t == null) return 'JUST NOW';
+    final diff = DateTime.now().difference(t.toDate());
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  void _showJobDialog(Map<String, dynamic> data) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceContainerHigh,
+        title: Text('Review Request', style: GoogleFonts.spaceGrotesk(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
+        content: Text(data['problemDescription'] ?? 'No description.', style: GoogleFonts.inter(color: AppColors.onSurfaceVariant)),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await FirebaseFirestore.instance.collection('jobs').doc(data['jobId']).update({'status': 'rejected'});
+            },
+            child: Text('REJECT', style: TextStyle(color: AppColors.error)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryContainer, foregroundColor: AppColors.onPrimary),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final String jobId = data['jobId'];
+              
+              // 1. Update job
+              await FirebaseFirestore.instance.collection('jobs').doc(jobId).update({'status': 'accepted'});
+
+              // 2. Create message natively leveraging robust Chat Service
+              try {
+                await ChatService().sendMessage(
+                  receiverId: data['userId'],
+                  text: data['problemDescription'],
+                );
+              } catch (_) {}
+
+              if (mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ChatScreen(
+                    otherUserId: data['userId'],
+                    otherUserName: 'Client',
+                    otherUserRole: 'client',
+                  )),
+                );
+              }
+            },
+            child: const Text('ACCEPT'),
+          ),
+        ],
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Nearby Requests', style: GoogleFonts.spaceGrotesk(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.onSurface)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(width: 8, height: 8, decoration: BoxDecoration(color: AppColors.primaryContainer, shape: BoxShape.circle)),
+                    const SizedBox(width: 8),
+                    Text('Active jobs searching', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.onSurfaceVariant)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                _buildFilterChip('ALL NEARBY', true),
+                const SizedBox(width: 8),
+                _buildFilterChip('PLUMBING', false),
+                const SizedBox(width: 8),
+                _buildFilterChip('ELECTRICAL', false),
+                const SizedBox(width: 8),
+                _buildFilterChip('SMART HOME', false),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('jobs')
+                  .where('technicianId', isEqualTo: uid)
+                  .where('status', isEqualTo: 'pending')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) return Center(child: CircularProgressIndicator(color: AppColors.primaryContainer));
+                if (snapshot.hasError) return Center(child: Text("Error fetching requests"));
+                
+                final docs = snapshot.data?.docs ?? [];
+                if (docs.isEmpty) {
+                  return Center(child: Text('No active requests', style: GoogleFonts.inter(color: AppColors.onSurfaceVariant)));
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final data = docs[index].data() as Map<String, dynamic>;
+                    
+                    final desc = data['problemDescription'] as String? ?? 'Needs repair';
+                    final firstWords = desc.split(' ').take(4).join(' ');
+                    final dist = data['distance'] as double? ?? 0.0;
+                    final price = data['estimatedPrice'] as String?;
+                    final urgency = data['urgency'] as String? ?? 'Standard';
+
+                    return GestureDetector(
+                      onTap: () => _showJobDialog(data),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1F2B),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(firstWords + '...', style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.location_on, size: 14, color: AppColors.primaryContainer),
+                                          const SizedBox(width: 4),
+                                          Text('${dist.toStringAsFixed(1)} km away', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(_timeAgoInfo(data['createdAt'] as Timestamp?), style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1, color: AppColors.primaryContainer.withValues(alpha: 0.6))),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(fontSize: 13, height: 1.5, color: AppColors.onSecondaryContainer)),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(color: AppColors.surfaceContainerHighest, borderRadius: BorderRadius.circular(4)),
+                                      child: Text(urgency.toUpperCase(), style: GoogleFonts.spaceGrotesk(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1, color: AppColors.onSurface)),
+                                    ),
+                                    if (price != null && price.isNotEmpty) ...[
+                                      const SizedBox(width: 12),
+                                      Text('Est. \$$price', style: GoogleFonts.inter(fontSize: 11, fontStyle: FontStyle.italic, fontWeight: FontWeight.w500, color: AppColors.onSurfaceVariant)),
+                                    ],
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(color: AppColors.primaryContainer, borderRadius: BorderRadius.circular(8)),
+                                  child: Text('VIEW', style: GoogleFonts.spaceGrotesk(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.onPrimary)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, bool active) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: active ? AppColors.primaryContainer : AppColors.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: active ? FontWeight.bold : FontWeight.w600, color: active ? AppColors.onPrimaryFixed : AppColors.onSurfaceVariant)),
     );
   }
 }

@@ -149,7 +149,14 @@ class _HomeScreenContentState extends State<HomeScreenContent>
     super.build(context);
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
+      body: RefreshIndicator(
+        color: AppColors.primaryContainer,
+        backgroundColor: AppColors.surfaceContainerHigh,
+        onRefresh: () async {
+          await _loadUserData();
+          await _initLocation();
+        },
+        child: CustomScrollView(
         slivers: [
           // ── Fixed Header ──
           SliverToBoxAdapter(child: _buildTopBar()),
@@ -176,6 +183,7 @@ class _HomeScreenContentState extends State<HomeScreenContent>
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -565,6 +573,7 @@ class _HomeScreenContentState extends State<HomeScreenContent>
             stream: FirebaseFirestore.instance
                 .collection('users')
                 .where('role', isEqualTo: 'technician')
+                .where('isOnline', isEqualTo: true)
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
@@ -579,10 +588,9 @@ class _HomeScreenContentState extends State<HomeScreenContent>
                 );
               }
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                print("DEBUG: Zero users found with role=='technician'!");
                 return Center(
                   child: Text(
-                    'No technicians available',
+                    'No technicians available nearby',
                     style: GoogleFonts.inter(color: AppColors.onSurfaceVariant),
                   ),
                 );
@@ -596,30 +604,24 @@ class _HomeScreenContentState extends State<HomeScreenContent>
               final List<Map<String, dynamic>> nearbyTechs = [];
               for (var doc in docs) {
                 final data = doc.data() as Map<String, dynamic>;
-                print("DEBUG EXAMINING DOC: ${doc.id} | data: $data");
                 
                 final dynamic techLatRaw = data['lat'] ?? data['location']?['lat'];
                 final dynamic techLngRaw = data['lng'] ?? data['location']?['lng'];
                 
-                if (techLatRaw == null || techLngRaw == null) {
-                  print("DEBUG SKIPPED: ${doc.id} due to NULL lat/lng (found lat=$techLatRaw, lng=$techLngRaw)");
-                  continue;
-                }
+                if (techLatRaw == null || techLngRaw == null) continue;
 
                 final techLat = (techLatRaw as num).toDouble();
                 final techLng = (techLngRaw as num).toDouble();
 
                 final distance = _calculateDistance(_userLat!, _userLng!, techLat, techLng);
 
-                print("TECH: ${data['fullName'] ?? data['name']}");
+                print("TECH: ${data['fullName']}");
                 print("Distance: $distance km");
 
                 if (distance <= 10) {
                   data['calculated_distance'] = distance;
                   data['doc_id'] = doc.id;
                   nearbyTechs.add(data);
-                } else {
-                  print("DEBUG SKIPPED: ${doc.id} due to distance $distance > 10km");
                 }
               }
 
@@ -628,7 +630,7 @@ class _HomeScreenContentState extends State<HomeScreenContent>
               if (nearbyTechs.isEmpty) {
                 return Center(
                   child: Text(
-                    'No technicians nearby',
+                    'No technicians available nearby',
                     style: GoogleFonts.inter(color: AppColors.onSurfaceVariant),
                   ),
                 );

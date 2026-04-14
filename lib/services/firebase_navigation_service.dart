@@ -7,6 +7,9 @@ import '../screens/client_home_screen.dart';
 import '../screens/technician_home_screen.dart';
 import '../screens/onboarding/technician_onboarding_flow.dart';
 import '../theme/app_colors.dart';
+import '../models/technician_onboarding_data.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
 import 'user_service.dart';
 import 'local_storage_service.dart';
 
@@ -77,6 +80,7 @@ class NavigationService {
                     await _onTechnicianOnboardingComplete(
                       routeContext,
                       user.uid,
+                      data,
                     );
                   },
                 ),
@@ -112,11 +116,73 @@ class NavigationService {
     }
   }
 
+  static Future<void> completeTechnicianOnboarding({
+    required String uid,
+    required String fullName,
+    required String speciality,
+    required String imageUrl,
+    required double lat,
+    required double lng,
+    String? bio,
+  }) async {
+    await FirebaseFirestore.instance.collection('users').doc(uid).update({
+      'fullName': fullName,
+      'speciality': speciality,
+      'profileImage': imageUrl,
+      'lat': lat,
+      'lng': lng,
+      'bio': bio ?? '',
+      'rating': 0.0,
+      'isOnline': true,
+      'onboardingCompleted': true,
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+  }
+
   static Future<void> _onTechnicianOnboardingComplete(
     BuildContext routeContext,
     String uid,
+    TechnicianOnboardingData data,
   ) async {
     try {
+      // 1. Fetch location natively
+      double lat = 0.0;
+      double lng = 0.0;
+      
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (serviceEnabled) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+          final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+          lat = position.latitude;
+          lng = position.longitude;
+        }
+      }
+
+      // 2. Extract specific variables locally
+      final fullName = data.fullName ?? 'Technician';
+      final speciality = data.specialties.isNotEmpty ? data.specialties.first : 'Specialist';
+      final profileImage = data.profilePhotoUrl ?? '';
+      final bio = data.bio ?? '';
+
+      print("\nONBOARDING DATA SAVED:");
+      print("Image: $profileImage");
+      print("Lat: $lat, Lng: $lng\n");
+
+      // 3. Save to Firestore explicitly
+      await completeTechnicianOnboarding(
+        uid: uid,
+        fullName: fullName,
+        speciality: speciality,
+        imageUrl: profileImage,
+        lat: lat,
+        lng: lng,
+        bio: bio,
+      );
+
       await _userService.updateOnboardingStatus(uid, true);
     } catch (e, st) {
       debugPrint('Onboarding Firestore update failed: $e\n$st');
