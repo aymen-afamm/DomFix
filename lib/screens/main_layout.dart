@@ -26,7 +26,7 @@ class MainLayoutScope extends InheritedWidget {
   bool updateShouldNotify(MainLayoutScope oldWidget) => false;
 }
 
-/// Single app shell: persistent glass bottom nav + tab bodies with preserved state.
+/// Single app shell: persistent bottom nav + tab bodies with preserved state.
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key, this.initialTabIndex = 0});
 
@@ -36,11 +36,8 @@ class MainLayout extends StatefulWidget {
   State<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> with SingleTickerProviderStateMixin {
+class _MainLayoutState extends State<MainLayout> {
   late int _currentIndex;
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
-  bool _tabAnimating = false;
 
   static const List<Widget> _tabBodies = [
     HomeScreenContent(),
@@ -54,34 +51,11 @@ class _MainLayoutState extends State<MainLayout> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _currentIndex = widget.initialTabIndex.clamp(0, _tabBodies.length - 1);
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-      value: 1,
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    );
   }
 
-  @override
-  void dispose() {
-    _fadeController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _onTabSelected(int index) async {
-    if (index == _currentIndex || _tabAnimating) return;
-    _tabAnimating = true;
-    try {
-      await _fadeController.animateTo(0, curve: Curves.easeInOut);
-      if (!mounted) return;
-      setState(() => _currentIndex = index);
-      await _fadeController.animateTo(1, curve: Curves.easeInOut);
-    } finally {
-      if (mounted) _tabAnimating = false;
-    }
+  void _onTabSelected(int index) {
+    if (index == _currentIndex) return;
+    setState(() => _currentIndex = index);
   }
 
   @override
@@ -90,14 +64,10 @@ class _MainLayoutState extends State<MainLayout> with SingleTickerProviderStateM
       selectTab: _onTabSelected,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        extendBody: true,
-        body: FadeTransition(
-          opacity: _fadeAnimation,
-          child: IndexedStack(
-            index: _currentIndex,
-            sizing: StackFit.expand,
-            children: _tabBodies,
-          ),
+        body: IndexedStack(
+          index: _currentIndex,
+          sizing: StackFit.expand,
+          children: _tabBodies,
         ),
         bottomNavigationBar: DomfixGlassBottomNav(
           currentIndex: _currentIndex,

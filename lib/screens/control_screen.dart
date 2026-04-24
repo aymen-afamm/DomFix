@@ -4,7 +4,6 @@ import '../theme/app_colors.dart';
 
 class ControlScreen extends StatefulWidget {
   const ControlScreen({super.key});
-
   @override
   State<ControlScreen> createState() => _ControlScreenState();
 }
@@ -23,29 +22,15 @@ class _ControlScreenState extends State<ControlScreen> with AutomaticKeepAliveCl
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.settings_remote_outlined,
-                size: 80,
-                color: AppColors.primaryContainer.withValues(alpha: 0.3),
+              Container(
+                width: 72, height: 72,
+                decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20)),
+                child: Icon(Icons.settings_remote_rounded, size: 36, color: AppColors.onSurfaceVariant.withValues(alpha: 0.4)),
               ),
-              const SizedBox(height: 24),
-              Text(
-                'CONTROL',
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.onSurface,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Device control coming soon',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: AppColors.onSurfaceVariant,
-                ),
-              ),
+              const SizedBox(height: 20),
+              Text('Smart Control', style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.onSurface)),
+              const SizedBox(height: 8),
+              Text('Device control coming soon', style: GoogleFonts.inter(fontSize: 14, color: AppColors.onSurfaceVariant)),
             ],
           ),
         ),

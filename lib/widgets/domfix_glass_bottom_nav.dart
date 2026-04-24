@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,7 +16,7 @@ class DomfixGlassBottomNav extends StatelessWidget {
   final ValueChanged<int> onTap;
   final int unreadMessages;
 
-  static const double barTopRadius = 16;
+  static const double barTopRadius = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -26,76 +25,62 @@ class DomfixGlassBottomNav extends StatelessWidget {
     final destinations = [
       DomfixNavDestination(
         icon: Icons.home_outlined,
-        selectedIcon: Icons.home,
+        selectedIcon: Icons.home_rounded,
         label: 'Home',
       ),
       DomfixNavDestination(
-        icon: Icons.chat_bubble_outline,
-        selectedIcon: Icons.chat_bubble,
+        icon: Icons.chat_bubble_outline_rounded,
+        selectedIcon: Icons.chat_bubble_rounded,
         label: 'Messages',
         badgeCount: unreadMessages,
       ),
       DomfixNavDestination(
-        icon: Icons.engineering_outlined,
-        selectedIcon: Icons.engineering,
-        label: 'Pros',
+        icon: Icons.search_rounded,
+        selectedIcon: Icons.search_rounded,
+        label: 'Find Pro',
       ),
       DomfixNavDestination(
-        icon: Icons.wb_incandescent_outlined,
-        selectedIcon: Icons.wb_incandescent,
+        icon: Icons.devices_other_outlined,
+        selectedIcon: Icons.devices_other_rounded,
         label: 'Control',
       ),
       DomfixNavDestination(
         icon: Icons.settings_outlined,
-        selectedIcon: Icons.settings,
+        selectedIcon: Icons.settings_rounded,
         label: 'Settings',
       ),
     ];
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(barTopRadius),
-      ),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF101419).withOpacity(0.65),
-            border: Border(
-              top: BorderSide(
-                color: AppColors.neonAccent.withOpacity(0.08),
-              ),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.neonAccent.withOpacity(0.08),
-                blurRadius: 30,
-                offset: const Offset(0, -5),
-              ),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        border: Border(
+          top: BorderSide(
+            color: AppColors.divider,
+            width: 1,
           ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                12,
-                10,
-                12,
-                bottom > 0 ? bottom : 18,
-              ),
-              child: Row(
-                children: List.generate(
-                  destinations.length,
-                  (i) => Expanded(
-                    child: _NavTab(
-                      data: destinations[i],
-                      selected: currentIndex == i,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        onTap(i);
-                      },
-                    ),
-                  ),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            8,
+            8,
+            8,
+            bottom > 0 ? 0 : 8,
+          ),
+          child: Row(
+            children: List.generate(
+              destinations.length,
+              (i) => Expanded(
+                child: _NavTab(
+                  data: destinations[i],
+                  selected: currentIndex == i,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    onTap(i);
+                  },
                 ),
               ),
             ),
@@ -120,7 +105,7 @@ class DomfixNavDestination {
   final int badgeCount;
 }
 
-class _NavTab extends StatefulWidget {
+class _NavTab extends StatelessWidget {
   const _NavTab({
     required this.data,
     required this.selected,
@@ -132,106 +117,69 @@ class _NavTab extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<_NavTab> createState() => _NavTabState();
-}
-
-class _NavTabState extends State<_NavTab> {
-  bool _pressed = false;
-
-  static const inactive = Color(0xFFE0E2EA);
-
-  @override
   Widget build(BuildContext context) {
-    final selected = widget.selected;
-
     final color = selected
         ? AppColors.neonAccent
-        : inactive.withOpacity(0.5);
+        : AppColors.onSurfaceVariant.withValues(alpha: 0.5);
 
     return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.onTap,
+      onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedScale(
-        scale: _pressed ? 0.88 : 1,
-        duration: const Duration(milliseconds: 120),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            color: selected
-                ? AppColors.neonAccent.withOpacity(0.1)
-                : Colors.transparent,
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: AppColors.neonAccent.withOpacity(0.35),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(
-                    selected
-                        ? widget.data.selectedIcon
-                        : widget.data.icon,
-                    color: color,
-                    size: 22,
-                  ),
-
-                  if (widget.data.badgeCount > 0)
-                    Positioned(
-                      right: -6,
-                      top: -4,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  selected ? data.selectedIcon : data.icon,
+                  color: color,
+                  size: 22,
+                ),
+                if (data.badgeCount > 0)
+                  Positioned(
+                    right: -8,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.background,
+                          width: 1.5,
                         ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${widget.data.badgeCount}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${data.badgeCount}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                     ),
-                ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              data.label,
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                color: color,
               ),
-
-              const SizedBox(height: 3),
-
-              Text(
-                widget.data.label.toUpperCase(),
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  letterSpacing: 1.1,
-                  fontWeight: FontWeight.w500,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
