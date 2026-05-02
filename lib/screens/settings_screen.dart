@@ -51,7 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
               Text('Settings', style: GoogleFonts.spaceGrotesk(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.onSurface)),
               const SizedBox(height: 24),
               _settingItem(Icons.person_outline_rounded, 'Profile', () {}),
-              _settingItem(Icons.notifications_outline_rounded, 'Notifications', () {}),
+              _settingItem(Icons.notifications_outlined, 'Notifications', () {}),
               _settingItem(Icons.shield_outlined, 'Privacy & Security', () {}),
               _settingItem(Icons.help_outline_rounded, 'Help & Support', () {}),
               const SizedBox(height: 16),

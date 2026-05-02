@@ -133,7 +133,6 @@ If audio recording is causing issues, you can test images and files first:
 //     ? () => setState(() => _isRecording = true)
 //     : (_isSending ? null : _sendMessage),
 
-// Replace with:
 onTap: _isSending ? null : _sendMessage,
 ```
 
