@@ -1,9 +1,12 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_colors.dart';
 
+/// Premium floating glass bottom navigation bar.
+/// Inspired by Arc browser, Tesla app, and modern iOS design language.
 class DomfixGlassBottomNav extends StatelessWidget {
   const DomfixGlassBottomNav({
     super.key,
@@ -16,35 +19,33 @@ class DomfixGlassBottomNav extends StatelessWidget {
   final ValueChanged<int> onTap;
   final int unreadMessages;
 
-  static const double barTopRadius = 0;
-
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
 
     final destinations = [
-      DomfixNavDestination(
+      _NavItem(
         icon: Icons.home_outlined,
         selectedIcon: Icons.home_rounded,
         label: 'Home',
       ),
-      DomfixNavDestination(
+      _NavItem(
         icon: Icons.chat_bubble_outline_rounded,
         selectedIcon: Icons.chat_bubble_rounded,
         label: 'Messages',
         badgeCount: unreadMessages,
       ),
-      DomfixNavDestination(
-        icon: Icons.search_rounded,
-        selectedIcon: Icons.search_rounded,
-        label: 'Find Pro',
+      _NavItem(
+        icon: Icons.engineering_outlined,
+        selectedIcon: Icons.engineering_rounded,
+        label: 'Pros',
       ),
-      DomfixNavDestination(
-        icon: Icons.devices_other_outlined,
-        selectedIcon: Icons.devices_other_rounded,
+      _NavItem(
+        icon: Icons.settings_remote_outlined,
+        selectedIcon: Icons.settings_remote_rounded,
         label: 'Control',
       ),
-      DomfixNavDestination(
+      _NavItem(
         icon: Icons.settings_outlined,
         selectedIcon: Icons.settings_rounded,
         label: 'Settings',
@@ -53,34 +54,52 @@ class DomfixGlassBottomNav extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.background,
-        border: Border(
-          top: BorderSide(
-            color: AppColors.divider,
-            width: 1,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.neonAccent.withValues(alpha: 0.05),
+            blurRadius: 24,
+            offset: const Offset(0, -4),
           ),
-        ),
+        ],
       ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            8,
-            8,
-            8,
-            bottom > 0 ? 0 : 8,
-          ),
-          child: Row(
-            children: List.generate(
-              destinations.length,
-              (i) => Expanded(
-                child: _NavTab(
-                  data: destinations[i],
-                  selected: currentIndex == i,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    onTap(i);
-                  },
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF101419).withValues(alpha: 0.60),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              border: Border(
+                top: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  8,
+                  16,
+                  bottom > 0 ? 0 : 12,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: List.generate(
+                    destinations.length,
+                    (i) => _GlassNavTab(
+                      item: destinations[i],
+                      selected: currentIndex == i,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        onTap(i);
+                      },
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -91,8 +110,8 @@ class DomfixGlassBottomNav extends StatelessWidget {
   }
 }
 
-class DomfixNavDestination {
-  const DomfixNavDestination({
+class _NavItem {
+  const _NavItem({
     required this.icon,
     required this.selectedIcon,
     required this.label,
@@ -105,28 +124,39 @@ class DomfixNavDestination {
   final int badgeCount;
 }
 
-class _NavTab extends StatelessWidget {
-  const _NavTab({
-    required this.data,
+class _GlassNavTab extends StatelessWidget {
+  const _GlassNavTab({
+    required this.item,
     required this.selected,
     required this.onTap,
   });
 
-  final DomfixNavDestination data;
+  final _NavItem item;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = selected
-        ? AppColors.neonAccent
-        : AppColors.onSurfaceVariant.withValues(alpha: 0.5);
+    final activeColor = AppColors.neonAccent;
+    final inactiveColor = const Color(0xFFE0E2EA).withValues(alpha: 0.50);
+    final color = selected ? activeColor : inactiveColor;
 
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.symmetric(
+          horizontal: selected ? 16 : 12,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.neonAccent.withValues(alpha: 0.10)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -134,21 +164,21 @@ class _NavTab extends StatelessWidget {
               clipBehavior: Clip.none,
               children: [
                 Icon(
-                  selected ? data.selectedIcon : data.icon,
+                  selected ? item.selectedIcon : item.icon,
                   color: color,
-                  size: 22,
+                  size: 24,
                 ),
-                if (data.badgeCount > 0)
+                if (item.badgeCount > 0)
                   Positioned(
                     right: -8,
                     top: -4,
                     child: Container(
                       padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
-                        color: AppColors.error,
+                        color: AppColors.emergency,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: AppColors.background,
+                          color: const Color(0xFF101419),
                           width: 1.5,
                         ),
                       ),
@@ -158,7 +188,7 @@ class _NavTab extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          '${data.badgeCount}',
+                          '${item.badgeCount}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 9,
@@ -172,10 +202,11 @@ class _NavTab extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              data.label,
+              item.label,
               style: GoogleFonts.inter(
                 fontSize: 10,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                fontWeight: selected ? FontWeight.w500 : FontWeight.w500,
+                letterSpacing: 0.02,
                 color: color,
               ),
             ),
