@@ -1,23 +1,28 @@
 import 'dart:math' show cos, sqrt, asin;
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geocoding/geocoding.dart';
 
 import '../theme/app_colors.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
 import '../widgets/home_widgets.dart';
+import '../widgets/hero_card.dart';
+import '../widgets/quick_action_card.dart';
 import 'main_layout.dart';
 import 'chat_screen.dart';
 import 'ai_chat_screen.dart';
 import 'technician_profile_screen.dart';
+import 'find_technician_screen.dart';
 
 
-/// HomeScreenContent — Premium UI matching HTML/Tailwind reference design.
-/// Sections: TopBar → Hero → Primary CTA → Quick Actions → Suggestions → Technicians → Environment → Messages
+/// HomeScreenContent — Premium futuristic UI.
+/// Focused sections: TopBar → Hero → AI CTA → Quick Actions → Technicians → Messages
 class HomeScreenContent extends StatefulWidget {
   const HomeScreenContent({super.key});
   @override
@@ -36,6 +41,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
   String? _userPhotoUrl;
   double? _userLat;
   double? _userLng;
+  String? _locationString;
 
   @override
   void initState() {
@@ -62,6 +68,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
       final cachedLng = prefs.getDouble('cachedLng');
       if (cachedLat != null && cachedLng != null && mounted) {
         setState(() { _userLat = cachedLat; _userLng = cachedLng; });
+        await _loadLocationString();
       }
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) return;
@@ -72,6 +79,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
       await prefs.setDouble('cachedLat', position.latitude);
       await prefs.setDouble('cachedLng', position.longitude);
       if (mounted) setState(() { _userLat = position.latitude; _userLng = position.longitude; });
+      await _loadLocationString();
     } catch (e) { debugPrint("Location error: $e"); }
   }
 
@@ -91,10 +99,32 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
     return 'Technician';
   }
 
-  String get _firstName {
-    if (_userName.isEmpty) return 'User';
-    return _userName.split(' ').first;
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return 'Good morning';
+    if (hour >= 12 && hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
+
+  Future<void> _loadLocationString() async {
+    if (_userLat == null || _userLng == null) return;
+    try {
+      final placemarks = await placemarkFromCoordinates(_userLat!, _userLng!);
+      if (!mounted) return;
+      if (placemarks.isNotEmpty) {
+        final pm = placemarks.first;
+        final city = pm.locality ?? pm.subAdministrativeArea;
+        final country = pm.country;
+        if (city != null && country != null) {
+          setState(() => _locationString = '$city, $country');
+        }
+      }
+    } catch (e) {
+      debugPrint('Geocoding error: $e');
+    }
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -112,19 +142,13 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 140),
               sliver: SliverList(delegate: SliverChildListDelegate([
                 const SizedBox(height: 24),
-                _buildHeroSection(),
+                _buildHeroCard(),
                 const SizedBox(height: 32),
-                _buildPrimaryAction(),
-                const SizedBox(height: 28),
-                _buildQuickActionsGrid(),
-                const SizedBox(height: 36),
-                _buildSuggestionsSection(),
-                const SizedBox(height: 36),
                 _buildNearbyTechniciansSection(),
-                const SizedBox(height: 36),
-                _buildActiveEnvironment(),
-                const SizedBox(height: 36),
+                const SizedBox(height: 32),
                 _buildRecentMessagesSection(),
+                const SizedBox(height: 32),
+                _buildQuickActionsGrid(),
               ])),
             ),
           ],
@@ -133,190 +157,179 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
     );
   }
 
-  // ─── TOP BAR (HTML: fixed header) ─────────────────────
+  // ─── TOP BAR — Minimal premium header ─────────────────
   Widget _buildTopBar() {
-    return Container(
-      padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 16, 24, 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101419).withValues(alpha: 0.60),
-      ),
-      child: Row(children: [
-        // Profile avatar
-        Container(
-          width: 32, height: 32,
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 16, 24, 16),
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.neonAccent.withValues(alpha: 0.20), width: 1),
+            color: AppColors.surface.withValues(alpha: 0.60),
+            border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.03), width: 1)),
           ),
-          child: ClipOval(
-            child: _userPhotoUrl != null
-                ? Image.network(_userPhotoUrl!, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(Icons.person, size: 16, color: AppColors.onSurfaceVariant))
-                : Icon(Icons.person, size: 16, color: AppColors.onSurfaceVariant),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Left: greeting + location
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_getGreeting()}, ${_userName.isNotEmpty ? _userName : 'there'} 👋',
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.onSurface, letterSpacing: -0.3,
+                      ),
+                    ),
+                    if (_locationString != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, size: 12, color: AppColors.onSurfaceVariant),
+                          const SizedBox(width: 4),
+                          Text(
+                            _locationString!,
+                            style: GoogleFonts.inter(
+                              fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          // Right: notification + avatar
+          Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(Icons.notifications_outlined, color: AppColors.onSurfaceVariant, size: 24),
+                  Positioned(top: 0, right: 0, child: Container(
+                    width: 8, height: 8,
+                    decoration: BoxDecoration(
+                      color: AppColors.neonAccent, shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.surface, width: 2),
+                    ),
+                  )),
+                ],
+              ),
+              const SizedBox(width: 16),
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.10), width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.neonAccent.withValues(alpha: 0.20),
+                      blurRadius: 8,
+                      spreadRadius: 0,
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: _userPhotoUrl != null
+                      ? Image.network(_userPhotoUrl!, fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Icon(Icons.person, size: 18, color: AppColors.onSurfaceVariant))
+                      : Icon(Icons.person, size: 18, color: AppColors.onSurfaceVariant),
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 12),
-        // DOMFIX brand
-        Text('DOMFIX', style: GoogleFonts.spaceGrotesk(
-          fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: 3, color: AppColors.neonAccent,
-        )),
-        const Spacer(),
-        // Notification bell
-        Stack(children: [
-          Icon(Icons.notifications_outlined, color: AppColors.onSurface, size: 24),
-          Positioned(top: 2, right: 2, child: Container(
-            width: 8, height: 8,
-            decoration: BoxDecoration(
-              color: AppColors.neonAccent, shape: BoxShape.circle,
-              border: Border.all(color: AppColors.background, width: 2),
+                ],
+              ),
             ),
-          )),
-        ]),
-      ]),
+          ),
+        );
+  }
+
+  // ─── HERO — Premium AI card with Lottie ───────────────
+  Widget _buildHeroCard() {
+    return HeroCard(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AIChatScreen())),
     );
   }
 
-  // ─── HERO (HTML: h1 "How can we help you today, Aymen?") ───
-  Widget _buildHeroSection() {
-    return RichText(
-      text: TextSpan(
-        style: GoogleFonts.spaceGrotesk(fontSize: 32, fontWeight: FontWeight.w700, height: 1.2, color: AppColors.onSurface, letterSpacing: -0.5),
-        children: [
-          const TextSpan(text: 'How can we\nhelp you today, '),
-          TextSpan(text: '$_firstName?', style: TextStyle(color: AppColors.neonAccent)),
+  // ─── QUICK ACTIONS — 3 compact cards ──────────────────
+  Widget _buildQuickActionsGrid() {
+    return Row(children: [
+      Expanded(child: QuickActionCard(
+        icon: Icons.engineering_rounded,
+        title: 'Find Technician',
+        accentColor: AppColors.onSurfaceVariant,
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FindTechnicianScreen())),
+      )),
+      const SizedBox(width: 12),
+      Expanded(child: QuickActionCard(
+        icon: Icons.psychology_rounded,
+        title: 'AI Assistant',
+        accentColor: AppColors.onSurfaceVariant,
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AIChatScreen())),
+      )),
+      const SizedBox(width: 12),
+      Expanded(child: QuickActionCard(
+        icon: Icons.emergency_home_rounded,
+        title: 'Emergency',
+        accentColor: AppColors.emergency,
+        onTap: () => _showEmergencyDialog(),
+      )),
+    ]);
+  }
+
+  void _showEmergencyDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A2233),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [
+          Icon(Icons.emergency_rounded, color: AppColors.emergency, size: 24),
+          const SizedBox(width: 8),
+          Text('Emergency Service', style: GoogleFonts.spaceGrotesk(
+              fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.onSurface)),
+        ]),
+        content: Text('Connect with available technicians immediately for urgent issues.',
+            style: GoogleFonts.inter(fontSize: 14, color: Colors.white.withValues(alpha: 0.65))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.inter(
+                fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.65))),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const FindTechnicianScreen()));
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.emergency,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: Text('Find Now', style: GoogleFonts.inter(
+                fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+          ),
         ],
       ),
     );
   }
 
-  // ─── PRIMARY CTA (HTML: AI-Powered diagnosis button) ───
-  Widget _buildPrimaryAction() {
-    return Stack(clipBehavior: Clip.none, children: [
-      GestureDetector(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AIChatScreen())),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppColors.neonAccent,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: AppColors.neonAccent.withValues(alpha: 0.25), blurRadius: 24)],
-          ),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.onPrimaryFixed.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(Icons.bolt_rounded, color: AppColors.onPrimaryFixed, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Describe your issue', style: GoogleFonts.spaceGrotesk(
-                  fontSize: 19, fontWeight: FontWeight.w700, color: AppColors.onPrimaryFixed, height: 1.2)),
-              const SizedBox(height: 4),
-              Text('AI will diagnose it instantly →', style: GoogleFonts.inter(
-                  fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.onPrimaryFixed.withValues(alpha: 0.80))),
-            ])),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.onPrimaryFixed.withValues(alpha: 0.10),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.arrow_forward, color: AppColors.onPrimaryFixed, size: 22),
-            ),
-          ]),
-        ),
-      ),
-      // AI-POWERED badge
-      Positioned(top: -12, right: 16, child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerHighest.withValues(alpha: 0.90),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.neonAccent.withValues(alpha: 0.40)),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 12)],
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.auto_awesome, size: 12, color: AppColors.neonAccent),
-          const SizedBox(width: 5),
-          Text('AI-POWERED', style: GoogleFonts.inter(
-              fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.neonAccent, letterSpacing: 1)),
-        ]),
-      )),
-    ]);
-  }
-
-  // ─── QUICK ACTIONS (HTML: 2-col grid) ─────────────────
-  Widget _buildQuickActionsGrid() {
-    return Row(children: [
-      Expanded(child: _quickActionCard(
-        icon: Icons.home_outlined, title: 'Control Home', subtitle: 'Lights 40% • AC ON',
-        onTap: () => MainLayoutScope.maybeOf(context)?.selectTab(3),
-      )),
-      const SizedBox(width: 16),
-      Expanded(child: _quickActionCard(
-        icon: Icons.psychology_outlined, title: 'Ask AI for Help', subtitle: 'Describe your problem',
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AIChatScreen())),
-      )),
-    ]);
-  }
-
-  Widget _quickActionCard({required IconData icon, required String title, required String subtitle, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(icon, color: AppColors.neonAccent, size: 24),
-          const SizedBox(height: 14),
-          Text(title, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.onSurface)),
-          const SizedBox(height: 6),
-          Text(subtitle, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.onSurfaceVariant)),
-        ]),
-      ),
-    );
-  }
-
-  // ─── SUGGESTIONS (HTML: horizontal scroll cards) ──────
-  Widget _buildSuggestionsSection() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text('Suggestions for you', style: GoogleFonts.spaceGrotesk(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.onSurface, letterSpacing: -0.3)),
-        Text('VIEW ALL', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.neonAccent, letterSpacing: 1.2)),
-      ]),
-      const SizedBox(height: 16),
-      SizedBox(
-        height: 190,
-        child: ListView(scrollDirection: Axis.horizontal, clipBehavior: Clip.none, children: [
-          SuggestionCard(
-            icon: Icons.ac_unit, title: 'AC not cooling properly?', subtitle: 'Diagnostic AI ready',
-            ctaText: 'Fix this now', ctaIcon: Icons.auto_fix_high,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AIChatScreen())),
-          ),
-          const SizedBox(width: 16),
-          SuggestionCard(
-            icon: Icons.wifi, title: 'WiFi is slow?', subtitle: 'Optimize connection',
-            ctaText: 'Diagnose issue', ctaIcon: Icons.query_stats,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AIChatScreen())),
-          ),
-          const SizedBox(width: 16),
-        ]),
-      ),
-    ]);
-  }
-
   // ─── NEARBY TECHNICIANS ───────────────────────────────
   Widget _buildNearbyTechniciansSection() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Nearby Technicians', style: GoogleFonts.spaceGrotesk(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.onSurface, letterSpacing: -0.3)),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('Nearby Technicians', style: GoogleFonts.spaceGrotesk(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.onSurface, letterSpacing: -0.5)),
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FindTechnicianScreen())),
+            child: Text('SEE ALL', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.onSurfaceVariant, letterSpacing: 1.5)),
+          ),
+        ],
+      ),
       const SizedBox(height: 16),
       SizedBox(
         height: 220,
@@ -345,7 +358,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
 
                   return ListView.separated(
                     scrollDirection: Axis.horizontal, clipBehavior: Clip.none,
-                    itemCount: finalList.length, separatorBuilder: (_, __) => const SizedBox(width: 16),
+                    itemCount: finalList.length, separatorBuilder: (_, _) => const SizedBox(width: 16),
                     itemBuilder: (context, index) {
                       final d = finalList[index];
                       final techId = d['doc_id'] as String;
@@ -367,71 +380,22 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
     ]);
   }
 
-  // ─── ACTIVE ENVIRONMENT (HTML: compact 2-col grid) ────
-  Widget _buildActiveEnvironment() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('ACTIVE ENVIRONMENT', style: GoogleFonts.inter(
-          fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 2, color: AppColors.onSurfaceVariant.withValues(alpha: 0.80))),
-      const SizedBox(height: 14),
-      Row(children: [
-        Expanded(child: _envCard(Icons.ac_unit, 'Living Room', 'AC:', 'ON', true)),
-        const SizedBox(width: 12),
-        Expanded(child: _envCard(Icons.shield_outlined, 'Security', '', 'ARMED', false)),
-      ]),
-    ]);
-  }
 
-  Widget _envCard(IconData icon, String label, String prefix, String value, bool active) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerHigh.withValues(alpha: 0.40),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: active ? AppColors.neonAccent.withValues(alpha: 0.10) : AppColors.onSurface.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, size: 18, color: active ? AppColors.neonAccent : AppColors.onSurfaceVariant),
-        ),
-        const SizedBox(width: 10),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.onSurfaceVariant, height: 1)),
-          const SizedBox(height: 6),
-          Row(children: [
-            Container(width: 6, height: 6, decoration: BoxDecoration(
-              color: active ? AppColors.neonAccent : Colors.white.withValues(alpha: 0.20), shape: BoxShape.circle)),
-            const SizedBox(width: 6),
-            RichText(text: TextSpan(style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.onSurface), children: [
-              if (prefix.isNotEmpty) TextSpan(text: '$prefix '),
-              TextSpan(text: value, style: TextStyle(color: active ? AppColors.neonAccent : AppColors.onSurfaceVariant)),
-            ])),
-          ]),
-        ])),
-      ]),
-    );
-  }
 
   // ─── RECENT MESSAGES ──────────────────────────────────
   Widget _buildRecentMessagesSection() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text('Recent Messages', style: GoogleFonts.spaceGrotesk(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.onSurface, letterSpacing: -0.3)),
+        Text('Recent Messages', style: GoogleFonts.spaceGrotesk(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.onSurface, letterSpacing: -0.5)),
         GestureDetector(
           onTap: () => MainLayoutScope.maybeOf(context)?.selectTab(1),
-          child: Row(children: [
-            Text('INBOX', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.neonAccent, letterSpacing: 1.2)),
-            const SizedBox(width: 6),
-            Container(
-              width: 18, height: 18,
-              decoration: BoxDecoration(color: AppColors.neonAccent, shape: BoxShape.circle),
-              child: Center(child: Text('2', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.onPrimaryFixed))),
-            ),
-          ]),
+          child: Row(
+            children: [
+              Text('View all', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.neonAccent)),
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_forward, size: 14, color: AppColors.neonAccent),
+            ],
+          ),
         ),
       ]),
       const SizedBox(height: 16),
@@ -440,12 +404,15 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) return _buildMessageSkeletons();
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return _buildEmptyMessages();
-          final chats = snapshot.data!.docs.take(3).toList();
-          return Column(children: chats.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return PremiumMessageTile(chatData: data, currentUserId: _auth.currentUser?.uid ?? '',
-                onTap: (otherId, otherName) => _navigateToChat(otherId, otherName));
-          }).toList());
+          final chats = snapshot.data!.docs.take(2).toList();
+          return Column(children: [
+            ...chats.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return PremiumMessageTile(chatData: data, currentUserId: _auth.currentUser?.uid ?? '',
+                  onTap: (otherId, otherName) => _navigateToChat(otherId, otherName));
+            }),
+            const SizedBox(height: 8),
+          ]);
         },
       ),
     ]);
@@ -477,9 +444,9 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
   Widget _buildSkeletonCards() {
     return ListView.separated(
       scrollDirection: Axis.horizontal, itemCount: 3,
-      separatorBuilder: (_, __) => const SizedBox(width: 16),
-      itemBuilder: (_, __) => ShimmerBox(child: Container(
-        width: 256, decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: BorderRadius.circular(20)),
+      separatorBuilder: (_, _) => const SizedBox(width: 16),
+      itemBuilder: (_, _) => ShimmerBox(child: Container(
+        width: 280, decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: BorderRadius.circular(20)),
       )),
     );
   }

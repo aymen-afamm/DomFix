@@ -14,9 +14,9 @@ class AppColors {
   static const Color surfaceBright           = Color(0xFF36393F);
 
   static const Color surfaceContainerLowest  = Color(0xFF0A0E13);  // html: surface-container-lowest
-  static const Color surfaceContainerLow     = Color(0xFF181C21);  // html: surface-container-low
+  static const Color surfaceContainerLow     = Color(0xFF121826);  // spec: secondary surface
   static const Color surfaceContainer        = Color(0xFF1C2025);  // html: surface-container
-  static const Color surfaceContainerHigh    = Color(0xFF262A30);  // html: surface-container-high
+  static const Color surfaceContainerHigh    = Color(0xFF1A2233);  // spec: surface elevated
   static const Color surfaceContainerHighest = Color(0xFF31353B);  // html: surface-container-highest
   static const Color surfaceVariant          = Color(0xFF31353B);
 

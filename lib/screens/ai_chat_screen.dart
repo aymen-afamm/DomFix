@@ -555,7 +555,7 @@ class _AIChatScreenState extends State<AIChatScreen> with SingleTickerProviderSt
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.primaryContainer.withValues(alpha: 0.15)

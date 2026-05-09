@@ -25,13 +25,13 @@ class PremiumTechnicianCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 256,
+        width: 280,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4, offset: const Offset(0, 2))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -40,62 +40,83 @@ class PremiumTechnicianCard extends StatelessWidget {
             // Avatar + Info row
             Row(
               children: [
-                Container(
-                  width: 56, height: 56,
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), color: AppColors.surfaceContainerHigh),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: photoUrl != null
-                        ? Image.network(photoUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultAvatar())
-                        : _defaultAvatar(),
-                  ),
+                Stack(
+                  children: [
+                    Container(
+                      width: 56, height: 56,
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), color: AppColors.surfaceContainerHigh),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: photoUrl != null
+                            ? Image.network(photoUrl!, fit: BoxFit.cover, errorBuilder: (_, _, _) => _defaultAvatar())
+                            : _defaultAvatar(),
+                      ),
+                    ),
+                    if (isAvailable)
+                      Positioned(
+                        bottom: 4,
+                        right: 4,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4ADE80),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.surfaceContainerLow, width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(name, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.onSurface),
+                    Text(name, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.onSurface),
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
-                    Text(job.toUpperCase(),
-                        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.onSurfaceVariant, letterSpacing: 1.5),
+                    Text(job,
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.onSurfaceVariant),
                         maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Row(children: [
-                      Icon(Icons.star_rounded, size: 14, color: AppColors.neonAccent),
-                      const SizedBox(width: 3),
+                      Icon(Icons.star, size: 14, color: AppColors.neonAccent),
+                      const SizedBox(width: 2),
                       Text(rating.toStringAsFixed(1), style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.onSurface)),
                       const SizedBox(width: 8),
-                      Text('${distance.toStringAsFixed(1)} km', style: GoogleFonts.inter(fontSize: 10, color: AppColors.onSurfaceVariant)),
+                      Text('•', style: GoogleFonts.inter(fontSize: 10, color: AppColors.onSurfaceVariant)),
+                      const SizedBox(width: 8),
+                      Text('${distance.toStringAsFixed(1)} km away', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.onSurfaceVariant)),
                     ]),
                   ]),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            // Status badges
-            Wrap(spacing: 6, runSpacing: 4, children: [
-              if (isAvailable) _badge('Available now', const Color(0xFF4ADE80), const Color(0xFF4ADE80)),
-              _badge('Responds fast', AppColors.neonAccent, AppColors.neonAccent),
-            ]),
-            const SizedBox(height: 12),
-            // CTA Buttons
+            // CTA Buttons — Chat Now (primary) + Profile (secondary)
             Row(children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(color: AppColors.surfaceContainerHigh, borderRadius: BorderRadius.circular(8)),
-                  child: Center(child: Text('View Profile', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.onSurface))),
-                ),
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: GestureDetector(
                   onTap: onMessage,
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(color: AppColors.neonAccent, borderRadius: BorderRadius.circular(8)),
-                    child: Center(child: Text('Message', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.onPrimaryFixed))),
+                    decoration: BoxDecoration(
+                      color: AppColors.neonAccent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(child: Text('Chat Now', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.onPrimaryFixed))),
                   ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  ),
+                  child: Center(child: Text('Profile', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.onSurface))),
                 ),
               ),
             ]),
@@ -105,22 +126,10 @@ class PremiumTechnicianCard extends StatelessWidget {
     );
   }
 
-  Widget _badge(String text, Color textColor, Color borderColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: textColor.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor.withValues(alpha: 0.20)),
-      ),
-      child: Text(text, style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.w700, color: textColor)),
-    );
-  }
-
   Widget _defaultAvatar() {
     return Container(
       color: AppColors.surfaceContainerHigh,
-      child: Center(child: Icon(Icons.engineering_rounded, color: AppColors.onSurfaceVariant, size: 24)),
+      child: Center(child: Icon(Icons.engineering_rounded, color: AppColors.onSurfaceVariant, size: 22)),
     );
   }
 }
@@ -152,14 +161,17 @@ class PremiumMessageTile extends StatelessWidget {
         final timestamp = chatData['lastMessageTime'] as Timestamp?;
         final timeStr = _formatTime(timestamp);
 
+        final isAi = name.toLowerCase().contains('ai') || name.toLowerCase().contains('assistant');
+        final nameColor = isAi ? AppColors.neonAccent : AppColors.onSurface;
+
         return GestureDetector(
           onTap: () => onTap(otherUserId, name),
           child: Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(20),
+              color: AppColors.surfaceContainerLow.withValues(alpha: 0.60),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
             ),
             child: Row(children: [
@@ -169,37 +181,40 @@ class PremiumMessageTile extends StatelessWidget {
                   width: 48, height: 48,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.surfaceContainerHigh,
-                    border: Border.all(color: AppColors.neonAccent.withValues(alpha: 0.20), width: 2),
+                    color: isAi ? AppColors.neonAccent.withValues(alpha: 0.05) : AppColors.surfaceContainerHigh,
+                    border: Border.all(color: isAi ? AppColors.neonAccent.withValues(alpha: 0.10) : Colors.white.withValues(alpha: 0.10)),
                   ),
                   child: ClipOval(
-                    child: photoUrl != null
-                        ? Image.network(photoUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _avatar(name))
-                        : _avatar(name),
+                    child: isAi
+                        ? Center(child: Icon(Icons.smart_toy, color: AppColors.neonAccent, size: 24))
+                        : (photoUrl != null
+                            ? Image.network(photoUrl, fit: BoxFit.cover, errorBuilder: (_, _, _) => _avatar(name))
+                            : _avatar(name)),
                   ),
                 ),
-                Positioned(
-                  bottom: 0, right: 0,
-                  child: Container(
-                    width: 12, height: 12,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4ADE80),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.surfaceContainerLow, width: 2),
+                if (!isAi)
+                  Positioned(
+                    bottom: 0, right: 0,
+                    child: Container(
+                      width: 12, height: 12,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4ADE80),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.surface, width: 2),
+                      ),
                     ),
                   ),
-                ),
               ]),
-              const SizedBox(width: 14),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                     Expanded(child: Text(name,
-                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.onSurface),
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: nameColor),
                         maxLines: 1, overflow: TextOverflow.ellipsis)),
                     Text(timeStr, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant)),
                   ]),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(lastMessage,
                       style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.onSurfaceVariant),
                       maxLines: 1, overflow: TextOverflow.ellipsis),

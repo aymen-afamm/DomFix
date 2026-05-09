@@ -38,7 +38,7 @@ class DomfixGlassBottomNav extends StatelessWidget {
       _NavItem(
         icon: Icons.engineering_outlined,
         selectedIcon: Icons.engineering_rounded,
-        label: 'Pros',
+        label: 'Find Pro',
       ),
       _NavItem(
         icon: Icons.settings_remote_outlined,
@@ -145,7 +145,7 @@ class _GlassNavTab extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
         padding: EdgeInsets.symmetric(
           horizontal: selected ? 16 : 12,
@@ -163,10 +163,15 @@ class _GlassNavTab extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(
-                  selected ? item.selectedIcon : item.icon,
-                  color: color,
-                  size: 24,
+                AnimatedScale(
+                  scale: selected ? 1.1 : 1.0,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(
+                    selected ? item.selectedIcon : item.icon,
+                    color: color,
+                    size: 24,
+                  ),
                 ),
                 if (item.badgeCount > 0)
                   Positioned(
@@ -205,7 +210,7 @@ class _GlassNavTab extends StatelessWidget {
               item.label,
               style: GoogleFonts.inter(
                 fontSize: 10,
-                fontWeight: selected ? FontWeight.w500 : FontWeight.w500,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                 letterSpacing: 0.02,
                 color: color,
               ),
