@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:lottie/lottie.dart';
 
 import '../theme/app_colors.dart';
 import '../services/user_service.dart';
@@ -131,6 +132,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
     super.build(context);
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: _buildFloatingAIAssistant(),
       body: RefreshIndicator(
         color: AppColors.neonAccent,
         backgroundColor: AppColors.surface,
@@ -152,6 +154,45 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
               ])),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // ─── FLOATING AI ASSISTANT ───────────────────────────────
+  Widget _buildFloatingAIAssistant() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16, right: 8),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.neonAccent.withValues(alpha: 0.25),
+            blurRadius: 24,
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: FloatingActionButton(
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AIChatScreen())),
+        backgroundColor: const Color(0xFF101419),
+        elevation: 0,
+        shape: CircleBorder(
+          side: BorderSide(color: AppColors.neonAccent.withValues(alpha: 0.6), width: 1.5),
+        ),
+        child: ClipOval(
+          child: Lottie.asset(
+            'assets/images/Welcome Animation.json',
+            width: 48,
+            height: 48,
+            fit: BoxFit.contain,
+            repeat: true,
+          ),
         ),
       ),
     );
@@ -271,7 +312,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> with AutomaticKee
       )),
       const SizedBox(width: 12),
       Expanded(child: QuickActionCard(
-        icon: Icons.emergency_home_rounded,
+        icon: Icons.emergency_rounded,
         title: 'Emergency',
         accentColor: AppColors.emergency,
         onTap: () => _showEmergencyDialog(),
