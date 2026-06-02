@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
@@ -17,6 +19,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _isSkipPressed = false;
 
   @override
   void dispose() {
@@ -27,6 +30,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _onPageChanged(int page) {
     setState(() {
       _currentPage = page;
+    });
+  }
+
+  void _setSkipPressed(bool isPressed) {
+    if (!mounted || _isSkipPressed == isPressed) {
+      return;
+    }
+
+    setState(() {
+      _isSkipPressed = isPressed;
     });
   }
 
@@ -79,11 +92,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-
-
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -96,26 +107,97 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               color: AppColors.primaryContainer,
             ),
           ),
-          GestureDetector(
-            onTap: _skip,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.secondary,
-                borderRadius: BorderRadius.circular(20),
+          _buildSkipButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkipButton() {
+    final backgroundColors = _isSkipPressed
+        ? [
+            AppColors.primaryContainer.withValues(alpha: 0.18),
+            AppColors.surfaceContainerHigh.withValues(alpha: 0.92),
+          ]
+        : [
+            Colors.white.withValues(alpha: 0.10),
+            Colors.white.withValues(alpha: 0.04),
+          ];
+
+    final borderOpacity = _isSkipPressed ? 0.55 : 0.26;
+    final glowOpacity = _isSkipPressed ? 0.28 : 0.16;
+    final labelColor =
+        _isSkipPressed ? AppColors.onPrimary : AppColors.primaryContainer;
+
+    return Semantics(
+      button: true,
+      label: 'Skip onboarding',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _setSkipPressed(true),
+        onTapUp: (_) => _setSkipPressed(false),
+        onTapCancel: () => _setSkipPressed(false),
+        onTap: _skip,
+        child: AnimatedScale(
+          scale: _isSkipPressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOut,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: backgroundColors,
               ),
-              child: Text(
-                'SKIP',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  letterSpacing: 2,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.onSurfaceVariant,
+              border: Border.all(
+                color: AppColors.primaryContainer.withValues(alpha: borderOpacity),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.neonAccent.withValues(alpha: glowOpacity),
+                  blurRadius: _isSkipPressed ? 18 : 24,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.32),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Skip',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.1,
+                        color: labelColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 14,
+                      color: labelColor,
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

@@ -929,7 +929,7 @@ class _HomeScreenContentState extends State<HomeScreenContent>
             ),
           ),
           // Content
-n          Column(
+          Column(
             children: [
               // Header with avatar and rating
               Row(
