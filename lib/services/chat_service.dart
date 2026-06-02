@@ -276,6 +276,50 @@ class ChatService {
     }
   }
 
+  /// Real-time chat metadata for typing, presence, and booking unlock state.
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getChatDocumentStream(
+      String chatId) {
+    return _firestore.collection('chats').doc(chatId).snapshots();
+  }
+
+  /// Ensure the parent chat exists before writing metadata.
+  Future<void> ensureChatDocument({required String otherUserId}) async {
+    if (currentUserId.isEmpty) throw Exception('User not authenticated');
+    final chatId = ChatService.generateChatId(currentUserId, otherUserId);
+    await _firestore.collection('chats').doc(chatId).set({
+      'participants': [currentUserId, otherUserId],
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> updateTyping({
+    required String chatId,
+    required String otherUserId,
+    required bool isTyping,
+  }) async {
+    if (currentUserId.isEmpty) return;
+    await _firestore.collection('chats').doc(chatId).set({
+      'participants': [currentUserId, otherUserId],
+      'typing_$currentUserId': isTyping,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> updatePresence({
+    required String chatId,
+    required String otherUserId,
+    required bool isOnline,
+  }) async {
+    if (currentUserId.isEmpty) return;
+    await _firestore.collection('chats').doc(chatId).set({
+      'participants': [currentUserId, otherUserId],
+      'online_$currentUserId': isOnline,
+      'lastSeen_$currentUserId': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   /// Create initial chat document
   /// Useful for creating chat before first message
   Future<void> createChat({
